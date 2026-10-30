@@ -17,6 +17,7 @@ class Team {
     this.draws = 0,
     this.primaryColor = 0xFF2EE59D,
     this.secondaryColor = 0xFFFFFFFF,
+    this.seasonStats = const {},
   });
 
   final String id;
@@ -31,9 +32,15 @@ class Team {
   final int losses;
   final int draws;
 
-  /// ARGB color used on bet cards and comparison views.
+  /// ARGB color used on badges and comparison views.
   final int primaryColor;
   final int secondaryColor;
+
+  /// Team season averages keyed by stat code, e.g. `ppg`, `papg`, `ypg`.
+  final Map<String, double> seasonStats;
+
+  double stat(String key, [double fallback = 0]) =>
+      seasonStats[key] ?? fallback;
 
   int get gamesPlayed => wins + losses + draws;
 
@@ -58,6 +65,7 @@ class Team {
     int? draws,
     int? primaryColor,
     int? secondaryColor,
+    Map<String, double>? seasonStats,
   }) {
     return Team(
       id: id ?? this.id,
@@ -73,6 +81,7 @@ class Team {
       draws: draws ?? this.draws,
       primaryColor: primaryColor ?? this.primaryColor,
       secondaryColor: secondaryColor ?? this.secondaryColor,
+      seasonStats: seasonStats ?? this.seasonStats,
     );
   }
 
@@ -90,6 +99,7 @@ class Team {
         'draws': draws,
         'primaryColor': primaryColor,
         'secondaryColor': secondaryColor,
+        'seasonStats': seasonStats,
       };
 
   factory Team.fromJson(Map<String, dynamic> json) {
@@ -107,6 +117,7 @@ class Team {
       draws: asInt(json['draws']),
       primaryColor: asInt(json['primaryColor'], 0xFF2EE59D),
       secondaryColor: asInt(json['secondaryColor'], 0xFFFFFFFF),
+      seasonStats: asDoubleMap(json['seasonStats']),
     );
   }
 
