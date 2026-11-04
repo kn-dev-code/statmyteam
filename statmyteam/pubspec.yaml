@@ -1,5 +1,5 @@
 name: statmyteam
-description: "StatMyTeam gathers team and player stats, matchup win chances, and a virtual bankroll for educated bets."
+description: "StatMyTeam: football team and player stats, head-to-head comparisons, and matchup projections."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

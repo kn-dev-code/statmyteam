@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/stats_widgets.dart';
-import 'home_screen.dart';
 import 'team_select_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
@@ -50,13 +49,6 @@ class MainMenuScreen extends StatelessWidget {
                 onTap: () => open(
                   const TeamSelectScreen(mode: TeamSelectMode.single),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _MenuCard(
-                icon: Icons.receipt_long,
-                title: 'Bet Board',
-                subtitle: 'Virtual bankroll and picks',
-                onTap: () => open(const HomeScreen()),
               ),
               const SizedBox(height: 28),
               const Text(

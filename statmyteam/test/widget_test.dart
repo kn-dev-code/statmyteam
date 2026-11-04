@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:statmyteam/data/stats_repository.dart';
 import 'package:statmyteam/main.dart';
-import 'package:statmyteam/state/betting_controller.dart';
 import 'package:statmyteam/widgets/stats_widgets.dart';
 
-Widget _app() => StatMyTeamApp(
-      controller: BettingController.demo(),
-      repository: StatsRepository.sampleFootball(),
-    );
+Widget _app() => StatMyTeamApp(repository: StatsRepository.sampleFootball());
 
 void _tallView(WidgetTester tester) {
   tester.view.physicalSize = const Size(800, 2400);
@@ -17,13 +13,8 @@ void _tallView(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-Future<void> _openBetBoard(WidgetTester tester) async {
-  await tester.tap(find.text('Bet Board'));
-  await tester.pumpAndSettle();
-}
-
 void main() {
-  testWidgets('main menu offers head-to-head, team stats, and bet board', (
+  testWidgets('main menu offers head-to-head and team stats', (
     tester,
   ) async {
     await tester.pumpWidget(_app());
@@ -31,37 +22,7 @@ void main() {
     expect(find.text('StatMyTeam'), findsOneWidget);
     expect(find.text('Head-to-Head'), findsOneWidget);
     expect(find.text('Team Stats'), findsOneWidget);
-    expect(find.text('Bet Board'), findsOneWidget);
-  });
-
-  testWidgets('shows bankroll, bet board, and prediction history', (
-    tester,
-  ) async {
-    _tallView(tester);
-    await tester.pumpWidget(_app());
-    await _openBetBoard(tester);
-
-    expect(find.text('VIRTUAL BANKROLL'), findsOneWidget);
-    expect(find.text('Bet board'), findsOneWidget);
-    expect(find.text('Prediction log'), findsOneWidget);
-    expect(find.text('LAL ML'), findsWidgets);
-    expect(find.text('WON'), findsWidgets);
-    expect(find.text('LOST'), findsWidgets);
-    expect(find.text('OPEN'), findsWidgets);
-  });
-
-  testWidgets('adding a moneyline updates the bet slip', (tester) async {
-    await tester.pumpWidget(_app());
-    await _openBetBoard(tester);
-
-    await tester.tap(find.text('Add moneyline').first);
-    await tester.pumpAndSettle();
-    expect(find.text('On slip'), findsOneWidget);
-
-    await tester.tap(find.byType(FloatingActionButton));
-    await tester.pumpAndSettle();
-    expect(find.text('Bet slip'), findsWidgets);
-    expect(find.text('Place virtual bets'), findsOneWidget);
+    expect(find.textContaining('Bet'), findsNothing);
   });
 
   testWidgets('pick two teams, see the projection, then compare players', (

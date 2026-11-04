@@ -1,5 +1,5 @@
-/// Sports StatMyTeam can model. Basketball ships first; the rest are ready
-/// for the same Team / Player / GameStats / Bet pipeline.
+/// Sports StatMyTeam can model. American football ships first; the rest are
+/// ready for the same Team / Player / GameStats pipeline.
 enum Sport {
   basketball,
   football,
