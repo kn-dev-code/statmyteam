@@ -18,10 +18,11 @@ class StatsRepository {
             ..sort((a, b) => b.startTime.compareTo(a.startTime)),
         );
 
+  /// Fictional NFL and NCAA sample leagues.
   factory StatsRepository.sampleFootball() => StatsRepository(
-        teams: footballTeams,
-        players: footballPlayers,
-        games: footballGames,
+        teams: [...footballTeams, ...collegeTeams],
+        players: [...footballPlayers, ...collegePlayers],
+        games: [...footballGames, ...collegeGames],
       );
 
   final List<Team> teams;
@@ -32,10 +33,16 @@ class StatsRepository {
 
   Team teamById(String id) => teams.firstWhere((team) => team.id == id);
 
-  /// Conference name → teams, best record first.
-  Map<String, List<Team>> get teamsByConference {
+  /// Leagues that have at least one team, in [League] order.
+  List<League> get leagues => [
+        for (final league in League.values)
+          if (teams.any((t) => t.league == league)) league,
+      ];
+
+  /// Conference name → teams in [league], best record first.
+  Map<String, List<Team>> teamsByConference(League league) {
     final map = <String, List<Team>>{};
-    for (final team in teams) {
+    for (final team in teams.where((t) => t.league == league)) {
       map.putIfAbsent(team.conference ?? 'Independent', () => []).add(team);
     }
     for (final list in map.values) {

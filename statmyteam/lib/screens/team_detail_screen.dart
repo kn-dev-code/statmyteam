@@ -48,8 +48,11 @@ class TeamDetailScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '${team.conference} Conference · '
-                              '${team.season} season',
+                              [
+                                if (team.league != null) team.league!.label,
+                                '${team.conference} Conference',
+                                '${team.season} season',
+                              ].join(' · '),
                               style: const TextStyle(color: AppColors.muted),
                             ),
                           ],

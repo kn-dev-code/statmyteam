@@ -59,6 +59,7 @@ class Player {
     this.weightLbs,
     this.yearsPro,
     this.college,
+    this.classYear,
   });
 
   final String id;
@@ -83,6 +84,9 @@ class Player {
   final int? weightLbs;
   final int? yearsPro;
   final String? college;
+
+  /// For college and high-school players, e.g. `Junior` or `RS Sophomore`.
+  final String? classYear;
 
   bool get isStarter => role == DepthRole.starter;
 
@@ -117,6 +121,7 @@ class Player {
     int? weightLbs,
     int? yearsPro,
     String? college,
+    String? classYear,
   }) {
     return Player(
       id: id ?? this.id,
@@ -135,6 +140,7 @@ class Player {
       weightLbs: weightLbs ?? this.weightLbs,
       yearsPro: yearsPro ?? this.yearsPro,
       college: college ?? this.college,
+      classYear: classYear ?? this.classYear,
     );
   }
 
@@ -155,6 +161,7 @@ class Player {
         'weightLbs': weightLbs,
         'yearsPro': yearsPro,
         'college': college,
+        'classYear': classYear,
       };
 
   factory Player.fromJson(Map<String, dynamic> json) {
@@ -180,6 +187,7 @@ class Player {
       weightLbs: json['weightLbs'] == null ? null : asInt(json['weightLbs']),
       yearsPro: json['yearsPro'] == null ? null : asInt(json['yearsPro']),
       college: json['college'] as String?,
+      classYear: json['classYear'] as String?,
     );
   }
 

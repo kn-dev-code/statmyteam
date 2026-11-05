@@ -92,4 +92,51 @@ void main() {
     expect(find.text('Starter'), findsOneWidget);
     expect(find.text('Quarterback'), findsOneWidget);
   });
+
+  testWidgets('teams are sorted into NFL and NCAA tabs', (tester) async {
+    _tallView(tester);
+    await tester.pumpWidget(_app());
+
+    await tester.tap(find.text('Team Stats'));
+    await tester.pumpAndSettle();
+    expect(find.text('Portland Lumberjacks'), findsOneWidget);
+    expect(find.text('Prairie Tech Bison'), findsNothing);
+
+    await tester.tap(find.text('NCAA'));
+    await tester.pumpAndSettle();
+    expect(find.text('Prairie Tech Bison'), findsOneWidget);
+    expect(find.text('Great Plains Conference'), findsOneWidget);
+    expect(find.text('Portland Lumberjacks'), findsNothing);
+
+    await tester.tap(find.text('Prairie Tech Bison'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('NCAA · Great Plains Conference'), findsOneWidget);
+
+    await tester.tap(find.text('Bo Calder').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Class'), findsOneWidget);
+    expect(find.text('RS Junior'), findsOneWidget);
+  });
+
+  testWidgets('switching league clears head-to-head picks', (tester) async {
+    _tallView(tester);
+    await tester.pumpWidget(_app());
+
+    await tester.tap(find.text('Head-to-Head'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Portland Lumberjacks'));
+    await tester.pump();
+    expect(find.text('Lumberjacks'), findsOneWidget); // slot A filled
+
+    await tester.tap(find.text('NCAA'));
+    await tester.pumpAndSettle();
+    expect(find.text('Team A'), findsOneWidget); // slot A empty again
+
+    await tester.tap(find.text('Cascade State Timberwolves'));
+    await tester.tap(find.text('Prairie Tech Bison'));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Compare teams'));
+    await tester.pumpAndSettle();
+    expect(find.text('CSU vs PTU'), findsOneWidget);
+  });
 }

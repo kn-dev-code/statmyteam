@@ -1,6 +1,8 @@
-// Fictional American-football league used while testing, before a live API
-// is wired in. Teams, players, and results are invented.
+// Fictional American-football leagues (pro and college) used while testing,
+// before a live API is wired in. Teams, players, and results are invented.
 import '../models/models.dart';
+
+part 'college_football_data.dart';
 
 const footballSeason = '2026';
 
@@ -14,8 +16,9 @@ Team _team(
   int losses,
   int primary,
   int secondary,
-  Map<String, double> stats,
-) {
+  Map<String, double> stats, {
+  League league = League.nfl,
+}) {
   return Team(
     id: id,
     name: name,
@@ -23,6 +26,7 @@ Team _team(
     city: city,
     sport: Sport.football,
     season: footballSeason,
+    league: league,
     conference: conference,
     wins: wins,
     losses: losses,
@@ -99,8 +103,9 @@ Player _p(
   required int age,
   required int height,
   required int weight,
-  required int yearsPro,
-  required String college,
+  int? yearsPro,
+  String? college,
+  String? classYear,
 }) {
   return Player(
     id: '$teamId-$id',
@@ -118,6 +123,7 @@ Player _p(
     weightLbs: weight,
     yearsPro: yearsPro,
     college: college,
+    classYear: classYear,
     seasonStats: stats,
   );
 }

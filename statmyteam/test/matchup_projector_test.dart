@@ -79,6 +79,18 @@ void main() {
     }
   });
 
+  test('every team belongs to a league, and both leagues have data', () {
+    expect(repo.leagues, [League.nfl, League.ncaa]);
+    for (final team in repo.teams) {
+      expect(team.league, isNotNull, reason: team.abbreviation);
+      expect(repo.rosterFor(team.id), hasLength(11),
+          reason: '${team.abbreviation} roster');
+    }
+    expect(repo.teamsByConference(League.ncaa).keys,
+        containsAll(['Pacific Ridge', 'Great Plains']));
+    expect(Team.fromJson(repo.teamById('ptu').toJson()).league, League.ncaa);
+  });
+
   test('player role and status survive JSON', () {
     final player = repo.rosterFor('sac').first;
     final decoded = Player.fromJson(player.toJson());

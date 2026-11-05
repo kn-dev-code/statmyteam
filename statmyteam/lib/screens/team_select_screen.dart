@@ -25,6 +25,7 @@ class TeamSelectScreen extends StatefulWidget {
 class _TeamSelectScreenState extends State<TeamSelectScreen> {
   Team? _a;
   Team? _b;
+  League? _league;
 
   bool get _isMatchup => widget.mode == TeamSelectMode.matchup;
 
@@ -32,6 +33,17 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   void initState() {
     super.initState();
     _a = widget.preselected;
+    _league = widget.preselected?.league;
+  }
+
+  /// Matchups stay within one league, so changing league clears picks.
+  void _selectLeague(League league) {
+    if (league == _league) return;
+    setState(() {
+      _league = league;
+      _a = null;
+      _b = null;
+    });
   }
 
   void _onTeamTap(Team team) {
@@ -65,7 +77,9 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = StatsScope.of(context);
-    final conferences = repo.teamsByConference;
+    final leagues = repo.leagues;
+    final league = _league ?? leagues.first;
+    final conferences = repo.teamsByConference(league);
 
     return Scaffold(
       appBar: AppBar(
@@ -94,6 +108,25 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           children: [
+            if (leagues.length > 1) ...[
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<League>(
+                  showSelectedIcon: false,
+                  segments: [
+                    for (final l in leagues)
+                      ButtonSegment(
+                        value: l,
+                        label: Text(l.label),
+                        tooltip: l.level,
+                      ),
+                  ],
+                  selected: {league},
+                  onSelectionChanged: (s) => _selectLeague(s.first),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_isMatchup) ...[
               Row(
                 children: [
@@ -127,8 +160,9 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
             ],
             Text(
               _isMatchup
-                  ? 'Tap two teams. Tap a selected team again to remove it.'
-                  : 'Choose a team to see its season.',
+                  ? 'Tap two ${league.label} teams. Tap a selected team again '
+                      'to remove it.'
+                  : 'Choose a ${league.label} team to see its season.',
               style: const TextStyle(color: AppColors.muted, fontSize: 13),
             ),
             for (final entry in conferences.entries) ...[

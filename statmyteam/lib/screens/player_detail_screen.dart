@@ -81,6 +81,7 @@ class PlayerSummaryCard extends StatelessWidget {
       if (player.age != null) ('Age', '${player.age}'),
       if (player.heightLabel != null) ('Height', player.heightLabel!),
       if (player.weightLbs != null) ('Weight', '${player.weightLbs} lb'),
+      if (player.classYear != null) ('Class', player.classYear!),
       if (player.yearsPro != null)
         ('Experience', player.yearsPro == 1 ? 'Rookie' : '${player.yearsPro} yrs'),
       if (player.college != null) ('College', player.college!),

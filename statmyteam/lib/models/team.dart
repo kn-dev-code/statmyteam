@@ -1,4 +1,5 @@
 import 'json_codec.dart';
+import 'league.dart';
 import 'sport.dart';
 
 /// A franchise in a given sport and season, including its overall W/L.
@@ -10,6 +11,7 @@ class Team {
     required this.city,
     required this.sport,
     required this.season,
+    this.league,
     this.conference,
     this.division,
     this.wins = 0,
@@ -26,6 +28,9 @@ class Team {
   final String city;
   final Sport sport;
   final String season;
+
+  /// Competition level, e.g. NFL or NCAA. Null for sports without one yet.
+  final League? league;
   final String? conference;
   final String? division;
   final int wins;
@@ -58,6 +63,7 @@ class Team {
     String? city,
     Sport? sport,
     String? season,
+    League? league,
     String? conference,
     String? division,
     int? wins,
@@ -74,6 +80,7 @@ class Team {
       city: city ?? this.city,
       sport: sport ?? this.sport,
       season: season ?? this.season,
+      league: league ?? this.league,
       conference: conference ?? this.conference,
       division: division ?? this.division,
       wins: wins ?? this.wins,
@@ -92,6 +99,7 @@ class Team {
         'city': city,
         'sport': sport.name,
         'season': season,
+        'league': league?.name,
         'conference': conference,
         'division': division,
         'wins': wins,
@@ -110,6 +118,9 @@ class Team {
       city: json['city'] as String,
       sport: Sport.values.byName(json['sport'] as String),
       season: json['season'] as String,
+      league: json['league'] == null
+          ? null
+          : League.values.byName(json['league'] as String),
       conference: json['conference'] as String?,
       division: json['division'] as String?,
       wins: asInt(json['wins']),
