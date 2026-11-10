@@ -1,11 +1,14 @@
+
 import 'package:flutter/material.dart';
 
 import '../search/stats_search_delegate.dart';
+import '../models/team.dart';
 import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stats_widgets.dart';
 import 'team_detail_screen.dart';
+import 'matchup_screen.dart';
 import 'team_select_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
@@ -18,10 +21,29 @@ class MainMenuScreen extends StatelessWidget {
 
     final repo = StatsScope.of(context);
     final favorites = FavoritesScope.of(context);
+
     final favoriteTeams = [
       for (final id in favorites.ids)
         if (repo.teams.any((t) => t.id == id)) repo.teamById(id),
     ]..sort((a, b) => b.winPercentage.compareTo(a.winPercentage));
+
+    final savedMatchups = <(Team, Team)>[];
+
+    for (final key in favorites.matchupIds) {
+      final parts = key.split('|');
+      if (parts.length != 2) continue;
+
+      final matchingA =
+          repo.teams.where((t) => t.id == parts[0]);
+      final matchingB =
+          repo.teams.where((t) => t.id == parts[1]);
+
+      if (matchingA.isNotEmpty && matchingB.isNotEmpty) {
+        savedMatchups.add(
+          (matchingA.first, matchingB.first),
+        );
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -42,18 +64,28 @@ class MainMenuScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
-              const Icon(Icons.sports_football, color: AppColors.accent, size: 40),
+              const Icon(
+                Icons.sports_football,
+                color: AppColors.accent,
+                size: 40,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'StatMyTeam',
-                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 repo.isLive
                     ? 'Live NFL data · football stats, matchups, and projections'
                     : 'Football stats, matchups, and projections',
-                style: const TextStyle(color: AppColors.muted, fontSize: 15),
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 15,
+                ),
               ),
               if (repo.loadError != null) ...[
                 const SizedBox(height: 10),
@@ -65,7 +97,10 @@ class MainMenuScreen extends StatelessWidget {
                   ),
                 ),
               ],
+
               const SizedBox(height: 28),
+
+              // Favorite teams section
               SectionTitle(
                 'Favorite teams',
                 subtitle: favoriteTeams.isEmpty
@@ -76,7 +111,9 @@ class MainMenuScreen extends StatelessWidget {
                 StatCard(
                   child: Text(
                     'No favorites yet. Open any team and tap the star.',
-                    style: TextStyle(color: AppColors.muted.withValues(alpha: 0.95)),
+                    style: TextStyle(
+                      color: AppColors.muted.withValues(alpha: 0.95),
+                    ),
                   ),
                 )
               else
@@ -84,7 +121,8 @@ class MainMenuScreen extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: favoriteTeams.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
@@ -94,10 +132,47 @@ class MainMenuScreen extends StatelessWidget {
                     final team = favoriteTeams[index];
                     return FavoriteTeamTile(
                       team: team,
-                      onTap: () => open(TeamDetailScreen(team: team)),
+                      onTap: () => open(
+                        TeamDetailScreen(team: team),
+                      ),
                     );
                   },
                 ),
+
+              // New saved matchup feature
+              const SizedBox(height: 20),
+              SectionTitle(
+                'Saved matchups',
+                subtitle: savedMatchups.isEmpty
+                    ? 'Bookmark a head-to-head comparison to see it here'
+                    : 'Tap to reopen a comparison',
+              ),
+              if (savedMatchups.isEmpty)
+                const StatCard(
+                  child: Text(
+                    'No saved matchups yet. Open a matchup and tap the bookmark.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                )
+              else
+                for (final pair in savedMatchups) ...[
+                  _MenuCard(
+                    icon: Icons.bookmark,
+                    title:
+                        '${pair.$1.abbreviation} vs ${pair.$2.abbreviation}',
+                    subtitle:
+                        '${pair.$1.displayName} vs ${pair.$2.displayName}',
+                    onTap: () => open(
+                      MatchupScreen(
+                        teamA: pair.$1,
+                        teamB: pair.$2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+              // Original menu options
               const SizedBox(height: 12),
               _MenuCard(
                 icon: Icons.compare_arrows,
@@ -107,18 +182,25 @@ class MainMenuScreen extends StatelessWidget {
                     'projected to win',
                 highlight: true,
                 onTap: () => open(
-                  const TeamSelectScreen(mode: TeamSelectMode.matchup),
+                  const TeamSelectScreen(
+                    mode: TeamSelectMode.matchup,
+                  ),
                 ),
               ),
+
               const SizedBox(height: 12),
               _MenuCard(
                 icon: Icons.shield_outlined,
                 title: 'Team Stats',
-                subtitle: 'Season numbers, recent form, roster, and injuries',
+                subtitle:
+                    'Season numbers, recent form, roster, and injuries',
                 onTap: () => open(
-                  const TeamSelectScreen(mode: TeamSelectMode.single),
+                  const TeamSelectScreen(
+                    mode: TeamSelectMode.single,
+                  ),
                 ),
               ),
+
               const SizedBox(height: 28),
               Text(
                 repo.isLive
@@ -127,7 +209,10 @@ class MainMenuScreen extends StatelessWidget {
                     : 'Sample league data: teams and players are fictional while '
                         'testing.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -155,7 +240,9 @@ class _MenuCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: highlight ? AppColors.surfaceHigh : AppColors.surface,
+      color: highlight
+          ? AppColors.surfaceHigh
+          : AppColors.surface,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -165,7 +252,9 @@ class _MenuCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: highlight ? AppColors.accent : AppColors.border,
+              color: highlight
+                  ? AppColors.accent
+                  : AppColors.border,
             ),
           ),
           child: Row(
@@ -174,10 +263,15 @@ class _MenuCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
+                  color: AppColors.accent.withValues(
+                    alpha: 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: AppColors.accent),
+                child: Icon(
+                  icon,
+                  color: AppColors.accent,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -202,7 +296,10 @@ class _MenuCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.muted),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.muted,
+              ),
             ],
           ),
         ),
