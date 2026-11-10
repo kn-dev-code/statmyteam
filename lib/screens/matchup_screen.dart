@@ -22,7 +22,8 @@ class MatchupScreen extends StatefulWidget {
   final Team teamB;
 
   @override
-  State<MatchupScreen> createState() => _MatchupScreenState();
+  State<MatchupScreen> createState() =>
+      _MatchupScreenState();
 }
 
 class _MatchupScreenState extends State<MatchupScreen> {
@@ -54,7 +55,10 @@ class _MatchupScreenState extends State<MatchupScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: favorites.isFavoriteMatchup(a.id, b.id)
+            tooltip: favorites.isFavoriteMatchup(
+              a.id,
+              b.id,
+            )
                 ? 'Remove saved matchup'
                 : 'Save matchup',
             icon: Icon(
@@ -70,10 +74,13 @@ class _MatchupScreenState extends State<MatchupScreen> {
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            20, 4, 20, 32,
+            20,
+            4,
+            20,
+            32,
           ),
           children: [
-            // Header and projection
+            // HEADER AND PROJECTION
             StatCard(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -195,7 +202,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // Why the projection is calculated
+            // PROJECTION FACTORS
             const SectionTitle(
               'What drives the projection',
               subtitle:
@@ -214,7 +221,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // Existing team statistics
+            // EXISTING TEAM STATISTICS
             const SectionTitle('Team stats'),
 
             StatCard(
@@ -233,7 +240,23 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // Recent form
+            // NEW FEATURE: RECENT GAME COMPARISON
+            const SectionTitle(
+              'Recent-game comparison',
+              subtitle:
+                  'Average over up to 5 completed games per team',
+            ),
+
+            StatCard(
+              child: _RecentComparison(
+                a: a,
+                b: b,
+                gamesA: repo.recentGames(a.id),
+                gamesB: repo.recentGames(b.id),
+              ),
+            ),
+
+            // EXISTING RECENT FORM
             const SectionTitle(
               'Recent form',
               subtitle: 'Last 5, newest first',
@@ -273,7 +296,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // Head-to-head history
+            // HEAD TO HEAD HISTORY
             const SectionTitle('Head-to-head'),
 
             StatCard(
@@ -296,7 +319,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
                     ),
             ),
 
-            // Injury report
+            // INJURY REPORT
             const SectionTitle('Injury report'),
 
             StatCard(
@@ -312,7 +335,9 @@ class _MatchupScreenState extends State<MatchupScreen> {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+
                     const SizedBox(height: 4),
+
                     if (repo.injuryReport(team.id).isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(
@@ -325,6 +350,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
                           ),
                         ),
                       ),
+
                     for (final p
                         in repo.injuryReport(team.id))
                       Padding(
@@ -346,6 +372,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
                           ],
                         ),
                       ),
+
                     if (team == a)
                       const SizedBox(height: 10),
                   ],
@@ -359,6 +386,7 @@ class _MatchupScreenState extends State<MatchupScreen> {
   }
 }
 
+// TEAM HEADER
 class _TeamHeader extends StatelessWidget {
   const _TeamHeader({
     required this.team,
@@ -370,7 +398,10 @@ class _TeamHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TeamBadge(team: team, size: 56),
+        TeamBadge(
+          team: team,
+          size: 56,
+        ),
         const SizedBox(height: 8),
         Text(
           team.displayName,
@@ -391,6 +422,7 @@ class _TeamHeader extends StatelessWidget {
   }
 }
 
+// PROJECTION METRIC
 class _Metric extends StatelessWidget {
   const _Metric({
     required this.label,
@@ -427,6 +459,7 @@ class _Metric extends StatelessWidget {
   }
 }
 
+// TEAM COLUMN HEADINGS
 class _ColumnHeads extends StatelessWidget {
   const _ColumnHeads({
     required this.a,
@@ -438,11 +471,11 @@ class _ColumnHeads extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle style(Team t) => TextStyle(
-      color: teamColor(t),
-      fontWeight: FontWeight.w900,
-      letterSpacing: 0.5,
-    );
+    TextStyle style(Team team) => TextStyle(
+          color: teamColor(team),
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5,
+        );
 
     return Padding(
       padding: const EdgeInsets.only(
@@ -465,6 +498,7 @@ class _ColumnHeads extends StatelessWidget {
   }
 }
 
+// MATCHUP PROJECTION FACTOR
 class _FactorTile extends StatelessWidget {
   const _FactorTile({
     required this.factor,
@@ -521,6 +555,141 @@ class _FactorTile extends StatelessWidget {
                 ),
               ),
             ),
+    );
+  }
+}
+
+// IMPLEMENTATION 2:
+// COMPARE RECENT GAME PERFORMANCE
+class _RecentComparison extends StatelessWidget {
+  const _RecentComparison({
+    required this.a,
+    required this.b,
+    required this.gamesA,
+    required this.gamesB,
+  });
+
+  final Team a;
+  final Team b;
+  final List<GameStats> gamesA;
+  final List<GameStats> gamesB;
+
+  // Use the five most recent completed games.
+  List<GameStats> _completedGames(
+    List<GameStats> games,
+  ) {
+    final completed = games
+        .where((game) =>
+            game.isFinal &&
+            game.home.score != null &&
+            game.away.score != null)
+        .toList();
+
+    completed.sort(
+      (x, y) =>
+          y.startTime.compareTo(x.startTime),
+    );
+
+    return completed.take(5).toList();
+  }
+
+  // Calculate a team's average for a selected metric.
+  double? _average(
+    List<GameStats> games,
+    String teamId,
+    int metric,
+  ) {
+    var sum = 0.0;
+    var count = 0;
+
+    for (final game in games) {
+      if (game.homeTeamId != teamId &&
+          game.awayTeamId != teamId) {
+        continue;
+      }
+
+      final isHome = game.homeTeamId == teamId;
+
+      final scored = isHome
+          ? game.home.score!
+          : game.away.score!;
+
+      final allowed = isHome
+          ? game.away.score!
+          : game.home.score!;
+
+      if (metric == 0) {
+        sum += scored;
+      } else if (metric == 1) {
+        sum += allowed;
+      } else {
+        sum += scored - allowed;
+      }
+
+      count++;
+    }
+
+    return count == 0 ? null : sum / count;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recentA = _completedGames(gamesA);
+    final recentB = _completedGames(gamesB);
+
+    if (recentA.isEmpty && recentB.isEmpty) {
+      return const Text(
+        'No completed games available for these teams.',
+        style: TextStyle(
+          color: AppColors.muted,
+        ),
+      );
+    }
+
+    const labels = [
+      'Points scored / game',
+      'Points allowed / game',
+      'Scoring margin / game',
+    ];
+
+    return Column(
+      children: [
+        _ColumnHeads(a: a, b: b),
+
+        for (final metric in [0, 1, 2])
+          StatCompareRow(
+            def: StatDef(
+              'recent_$metric',
+              labels[metric],
+              decimals: 1,
+              higherIsBetter: metric != 1,
+              signed: metric == 2,
+            ),
+            valueA: _average(
+              recentA,
+              a.id,
+              metric,
+            ),
+            valueB: _average(
+              recentB,
+              b.id,
+              metric,
+            ),
+            colorA: teamColor(a),
+            colorB: teamColor(b),
+          ),
+
+        const SizedBox(height: 8),
+
+        Text(
+          '${a.abbreviation}: ${recentA.length} games · '
+          '${b.abbreviation}: ${recentB.length} games',
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
   }
 }
