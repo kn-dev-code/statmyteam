@@ -229,6 +229,20 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
+            // Averages from recent completed games, alongside season stats.
+            const SectionTitle(
+              'Recent-game comparison',
+              subtitle: 'Average over up to 5 completed games per team',
+            ),
+            StatCard(
+              child: _RecentComparison(
+                a: a,
+                b: b,
+                gamesA: repo.recentGames(a.id),
+                gamesB: repo.recentGames(b.id),
+              ),
+            ),
+
             const SectionTitle('Recent form', subtitle: 'Last 5, newest first'),
             StatCard(
               child: Column(
@@ -445,6 +459,121 @@ class _FactorTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _RecentMetric {
+  scored('Points scored / game'),
+  allowed('Points allowed / game'),
+  margin('Scoring margin / game');
+
+  const _RecentMetric(this.label);
+
+  final String label;
+}
+
+/// Compares each team's averages over its most recent completed games.
+class _RecentComparison extends StatelessWidget {
+  const _RecentComparison({
+    required this.a,
+    required this.b,
+    required this.gamesA,
+    required this.gamesB,
+  });
+
+  final Team a;
+  final Team b;
+  final List<GameStats> gamesA;
+  final List<GameStats> gamesB;
+
+  /// The five most recent completed games with a final score.
+  List<GameStats> _completedGames(List<GameStats> games) {
+    final completed =
+        games
+            .where(
+              (game) =>
+                  game.isFinal &&
+                  game.home.score != null &&
+                  game.away.score != null,
+            )
+            .toList()
+          ..sort((x, y) => y.startTime.compareTo(x.startTime));
+    return completed.take(5).toList();
+  }
+
+  /// A team's per-game average for [metric], or null with no games.
+  double? _average(List<GameStats> games, String teamId, _RecentMetric metric) {
+    var sum = 0.0;
+    var count = 0;
+    for (final game in games) {
+      if (game.homeTeamId != teamId && game.awayTeamId != teamId) continue;
+      final isHome = game.homeTeamId == teamId;
+      final scored = isHome ? game.home.score! : game.away.score!;
+      final allowed = isHome ? game.away.score! : game.home.score!;
+      sum += switch (metric) {
+        _RecentMetric.scored => scored,
+        _RecentMetric.allowed => allowed,
+        _RecentMetric.margin => scored - allowed,
+      };
+      count++;
+    }
+    return count == 0 ? null : sum / count;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recentA = _completedGames(gamesA);
+    final recentB = _completedGames(gamesB);
+
+    if (recentA.isEmpty && recentB.isEmpty) {
+      return Text(
+        'No completed games available for these teams.',
+        style: TextStyle(color: AppColors.muted),
+      );
+    }
+
+    final headStyle = TextStyle(
+      color: AppColors.text,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.3,
+    );
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            TeamBadge(team: a, size: 28),
+            const SizedBox(width: 8),
+            Text(a.abbreviation, style: headStyle),
+            const Spacer(),
+            Text(b.abbreviation, style: headStyle),
+            const SizedBox(width: 8),
+            TeamBadge(team: b, size: 28),
+          ],
+        ),
+        const SizedBox(height: 4),
+        for (final metric in _RecentMetric.values)
+          StatCompareRow(
+            def: StatDef(
+              'recent_${metric.name}',
+              metric.label,
+              decimals: 1,
+              higherIsBetter: metric != _RecentMetric.allowed,
+              signed: metric == _RecentMetric.margin,
+            ),
+            valueA: _average(recentA, a.id, metric),
+            valueB: _average(recentB, b.id, metric),
+            colorA: teamColor(a),
+            colorB: teamColor(b),
+          ),
+        const SizedBox(height: 8),
+        Text(
+          '${a.abbreviation}: ${recentA.length} games · '
+          '${b.abbreviation}: ${recentB.length} games',
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+      ],
     );
   }
 }
