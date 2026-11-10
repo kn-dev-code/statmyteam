@@ -1,16 +1,22 @@
+
 import 'package:flutter/material.dart';
 
 import '../logic/football_stats.dart';
 import '../logic/matchup_projector.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
+import '../state/favorites_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stats_widgets.dart';
 import 'player_compare_screen.dart';
 
 /// Two teams side by side with a win projection.
 class MatchupScreen extends StatefulWidget {
-  const MatchupScreen({super.key, required this.teamA, required this.teamB});
+  const MatchupScreen({
+    super.key,
+    required this.teamA,
+    required this.teamB,
+  });
 
   final Team teamA;
   final Team teamB;
@@ -25,11 +31,13 @@ class _MatchupScreenState extends State<MatchupScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = StatsScope.of(context);
+    final favorites = FavoritesScope.of(context);
     final a = widget.teamA;
     final b = widget.teamB;
     final colorA = teamColor(a);
     final colorB = teamColor(b);
     final h2h = repo.headToHead(a.id, b.id);
+
     final projection = MatchupProjector.project(
       teamA: a,
       teamB: b,
@@ -40,19 +48,41 @@ class _MatchupScreenState extends State<MatchupScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text('${a.abbreviation} vs ${b.abbreviation}')),
+      appBar: AppBar(
+        title: Text(
+          '${a.abbreviation} vs ${b.abbreviation}',
+        ),
+        actions: [
+          IconButton(
+            tooltip: favorites.isFavoriteMatchup(a.id, b.id)
+                ? 'Remove saved matchup'
+                : 'Save matchup',
+            icon: Icon(
+              favorites.isFavoriteMatchup(a.id, b.id)
+                  ? Icons.bookmark
+                  : Icons.bookmark_border,
+            ),
+            onPressed: () =>
+                favorites.toggleMatchup(a.id, b.id),
+          ),
+        ],
+      ),
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+          padding: const EdgeInsets.fromLTRB(
+            20, 4, 20, 32,
+          ),
           children: [
-            // ── Header + projection ────────────────────────────────────
+            // Header and projection
             StatCard(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _TeamHeader(team: a)),
+                      Expanded(
+                        child: _TeamHeader(team: a),
+                      ),
                       const Text(
                         'VS',
                         style: TextStyle(
@@ -60,10 +90,14 @@ class _MatchupScreenState extends State<MatchupScreen> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      Expanded(child: _TeamHeader(team: b)),
+                      Expanded(
+                        child: _TeamHeader(team: b),
+                      ),
                     ],
                   ),
+
                   const SizedBox(height: 20),
+
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -76,13 +110,18 @@ class _MatchupScreenState extends State<MatchupScreen> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 10),
+
                   WinProbabilityBar(
                     teamA: a,
                     teamB: b,
-                    teamAChance: projection.teamAWinChance,
+                    teamAChance:
+                        projection.teamAWinChance,
                   ),
+
                   const SizedBox(height: 18),
+
                   Row(
                     children: [
                       _Metric(
@@ -90,14 +129,20 @@ class _MatchupScreenState extends State<MatchupScreen> {
                         value:
                             '${projection.teamAScore.round()}–${projection.teamBScore.round()}',
                       ),
-                      _Metric(label: 'Spread', value: projection.spreadLabel),
+                      _Metric(
+                        label: 'Spread',
+                        value: projection.spreadLabel,
+                      ),
                       _Metric(
                         label: 'Total',
-                        value: projection.projectedTotal.toStringAsFixed(1),
+                        value: projection.projectedTotal
+                            .toStringAsFixed(1),
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 18),
+
                   SizedBox(
                     width: double.infinity,
                     child: SegmentedButton<MatchupVenue>(
@@ -118,34 +163,49 @@ class _MatchupScreenState extends State<MatchupScreen> {
                       ],
                       selected: {_venue},
                       onSelectionChanged: (s) =>
-                          setState(() => _venue = s.first),
+                          setState(
+                            () => _venue = s.first,
+                          ),
                     ),
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 12),
+
             FilledButton.icon(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => PlayerCompareScreen(teamA: a, teamB: b),
+                  builder: (_) => PlayerCompareScreen(
+                    teamA: a,
+                    teamB: b,
+                  ),
                 ),
               ),
-              icon: const Icon(Icons.people_alt_outlined),
+              icon: const Icon(
+                Icons.people_alt_outlined,
+              ),
               label: const Text('Compare players'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(50),
-                textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
 
-            // ── Why ────────────────────────────────────────────────────
+            // Why the projection is calculated
             const SectionTitle(
               'What drives the projection',
-              subtitle: 'Season form, scoring margin, venue, and who is out',
+              subtitle:
+                  'Season form, scoring margin, venue, and who is out',
             ),
+
             StatCard(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                vertical: 6,
+              ),
               child: Column(
                 children: [
                   for (final factor in projection.factors)
@@ -154,8 +214,9 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // ── Stat by stat ───────────────────────────────────────────
+            // Existing team statistics
             const SectionTitle('Team stats'),
+
             StatCard(
               child: Column(
                 children: [
@@ -172,23 +233,33 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            // ── Form + history ─────────────────────────────────────────
-            const SectionTitle('Recent form', subtitle: 'Last 5, newest first'),
+            // Recent form
+            const SectionTitle(
+              'Recent form',
+              subtitle: 'Last 5, newest first',
+            ),
+
             StatCard(
               child: Column(
                 children: [
                   for (final team in [a, b])
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                      ),
                       child: Row(
                         children: [
-                          TeamBadge(team: team, size: 30),
+                          TeamBadge(
+                            team: team,
+                            size: 30,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               team.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           FormStrip(
@@ -201,26 +272,37 @@ class _MatchupScreenState extends State<MatchupScreen> {
                 ],
               ),
             ),
+
+            // Head-to-head history
             const SectionTitle('Head-to-head'),
+
             StatCard(
               child: h2h.isEmpty
                   ? const Text(
                       'These teams have not met in the last two seasons.',
-                      style: TextStyle(color: AppColors.muted),
+                      style: TextStyle(
+                        color: AppColors.muted,
+                      ),
                     )
                   : Column(
                       children: [
                         for (final game in h2h)
-                          GameResultTile(game: game, teamId: a.id, opponent: b),
+                          GameResultTile(
+                            game: game,
+                            teamId: a.id,
+                            opponent: b,
+                          ),
                       ],
                     ),
             ),
 
-            // ── Injuries ───────────────────────────────────────────────
+            // Injury report
             const SectionTitle('Injury report'),
+
             StatCard(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   for (final team in [a, b]) ...[
                     Text(
@@ -233,15 +315,22 @@ class _MatchupScreenState extends State<MatchupScreen> {
                     const SizedBox(height: 4),
                     if (repo.injuryReport(team.id).isEmpty)
                       const Padding(
-                        padding: EdgeInsets.only(bottom: 10),
+                        padding: EdgeInsets.only(
+                          bottom: 10,
+                        ),
                         child: Text(
                           'No players listed',
-                          style: TextStyle(color: AppColors.muted),
+                          style: TextStyle(
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
-                    for (final p in repo.injuryReport(team.id))
+                    for (final p
+                        in repo.injuryReport(team.id))
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                        ),
                         child: Row(
                           children: [
                             Expanded(
@@ -250,11 +339,15 @@ class _MatchupScreenState extends State<MatchupScreen> {
                                 '${p.injuryNote == null ? '' : ' · ${p.injuryNote}'}',
                               ),
                             ),
-                            PlayerStatusChip(status: p.status, compact: true),
+                            PlayerStatusChip(
+                              status: p.status,
+                              compact: true,
+                            ),
                           ],
                         ),
                       ),
-                    if (team == a) const SizedBox(height: 10),
+                    if (team == a)
+                      const SizedBox(height: 10),
                   ],
                 ],
               ),
@@ -267,7 +360,9 @@ class _MatchupScreenState extends State<MatchupScreen> {
 }
 
 class _TeamHeader extends StatelessWidget {
-  const _TeamHeader({required this.team});
+  const _TeamHeader({
+    required this.team,
+  });
 
   final Team team;
 
@@ -280,11 +375,16 @@ class _TeamHeader extends StatelessWidget {
         Text(
           team.displayName,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w800),
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         Text(
           team.record,
-          style: const TextStyle(color: AppColors.muted, fontSize: 13),
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 13,
+          ),
         ),
       ],
     );
@@ -292,7 +392,10 @@ class _TeamHeader extends StatelessWidget {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
+  const _Metric({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -304,13 +407,19 @@ class _Metric extends StatelessWidget {
         children: [
           Text(
             value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            style: const TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -319,7 +428,10 @@ class _Metric extends StatelessWidget {
 }
 
 class _ColumnHeads extends StatelessWidget {
-  const _ColumnHeads({required this.a, required this.b});
+  const _ColumnHeads({
+    required this.a,
+    required this.b,
+  });
 
   final Team a;
   final Team b;
@@ -327,17 +439,26 @@ class _ColumnHeads extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     TextStyle style(Team t) => TextStyle(
-          color: teamColor(t),
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.5,
-        );
+      color: teamColor(t),
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0.5,
+    );
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(
+        bottom: 4,
+      ),
       child: Row(
         children: [
-          Text(a.abbreviation, style: style(a)),
+          Text(
+            a.abbreviation,
+            style: style(a),
+          ),
           const Spacer(),
-          Text(b.abbreviation, style: style(b)),
+          Text(
+            b.abbreviation,
+            style: style(b),
+          ),
         ],
       ),
     );
@@ -345,22 +466,31 @@ class _ColumnHeads extends StatelessWidget {
 }
 
 class _FactorTile extends StatelessWidget {
-  const _FactorTile({required this.factor});
+  const _FactorTile({
+    required this.factor,
+  });
 
   final MatchupFactor factor;
 
   @override
   Widget build(BuildContext context) {
     final favors = factor.favors;
+
     return ListTile(
       dense: true,
       title: Text(
         factor.title,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+        ),
       ),
       subtitle: Text(
         factor.detail,
-        style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontSize: 12.5,
+        ),
       ),
       trailing: favors == null
           ? const Text(
@@ -372,9 +502,14 @@ class _FactorTile extends StatelessWidget {
               ),
             )
           : Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 4,
+              ),
               decoration: BoxDecoration(
-                color: teamColor(favors).withValues(alpha: 0.16),
+                color: teamColor(favors).withValues(
+                  alpha: 0.16,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
