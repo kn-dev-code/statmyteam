@@ -1,17 +1,49 @@
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists favorite team ids locally.
+/// Persists favorite teams and matchups locally.
 class FavoritesStore extends ChangeNotifier {
   FavoritesStore(this._prefs);
 
   static const _key = 'favorite_team_ids';
+  static const _matchupKey = 'favorite_matchup_ids';
 
   final SharedPreferences _prefs;
+
   late final Set<String> _ids =
       _prefs.getStringList(_key)?.toSet() ?? <String>{};
 
+  late final Set<String> _matchups =
+      _prefs.getStringList(_matchupKey)?.toSet() ?? <String>{};
+
   Set<String> get ids => Set.unmodifiable(_ids);
+  Set<String> get matchupIds => Set.unmodifiable(_matchups);
+
+  /// Make A vs B the same favorite as B vs A.
+  static String matchupKey(String a, String b) {
+    final sorted = [a, b]..sort();
+    return '${sorted[0]}|${sorted[1]}';
+  }
+
+  bool isFavoriteMatchup(String a, String b) =>
+      _matchups.contains(matchupKey(a, b));
+
+  Future<void> toggleMatchup(String a, String b) async {
+    if (a == b) return;
+
+    final key = matchupKey(a, b);
+
+    if (!_matchups.remove(key)) {
+      _matchups.add(key);
+    }
+
+    await _prefs.setStringList(
+      _matchupKey,
+      _matchups.toList()..sort(),
+    );
+    notifyListeners();
+  }
 
   bool isFavorite(String teamId) => _ids.contains(teamId);
 
@@ -21,7 +53,11 @@ class FavoritesStore extends ChangeNotifier {
     } else {
       _ids.add(teamId);
     }
-    await _prefs.setStringList(_key, _ids.toList()..sort());
+
+    await _prefs.setStringList(
+      _key,
+      _ids.toList()..sort(),
+    );
     notifyListeners();
   }
 
@@ -30,3 +66,4 @@ class FavoritesStore extends ChangeNotifier {
     return FavoritesStore(prefs);
   }
 }
+
