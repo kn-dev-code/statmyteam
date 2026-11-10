@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../search/stats_search_delegate.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
 import 'matchup_screen.dart';
 import 'team_detail_screen.dart';
@@ -12,12 +13,20 @@ enum TeamSelectMode { single, matchup }
 
 /// Pick one team (team stats) or two teams (head-to-head).
 class TeamSelectScreen extends StatefulWidget {
-  const TeamSelectScreen({super.key, required this.mode, this.preselected});
+  const TeamSelectScreen({
+    super.key,
+    required this.mode,
+    this.preselected,
+    this.bottomInset = 24,
+  });
 
   final TeamSelectMode mode;
 
   /// Fills the first matchup slot, e.g. when coming from a team page.
   final Team? preselected;
+
+  /// Extra space below the list, e.g. to clear a floating nav bar.
+  final double bottomInset;
 
   @override
   State<TeamSelectScreen> createState() => _TeamSelectScreenState();
@@ -83,32 +92,31 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
     final conferences = repo.teamsByConference(league);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isMatchup ? 'Head-to-Head' : 'Team Stats'),
+      appBar: PillAppBar(
+        title: _isMatchup ? 'Head-to-Head' : 'Team Stats',
         actions: [
-          IconButton(
+          RoundIconButton(
             tooltip: 'Search teams and players',
-            icon: const Icon(Icons.search),
-            onPressed: () => showSearch(
-              context: context,
-              delegate: StatsSearchDelegate(),
-            ),
+            icon: Icons.search_rounded,
+            onPressed: () =>
+                showSearch(context: context, delegate: StatsSearchDelegate()),
           ),
         ],
       ),
       bottomNavigationBar: _isMatchup
           ? SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: FilledButton.icon(
-                  onPressed: _a != null && _b != null ? _openMatchup : null,
-                  icon: const Icon(Icons.compare_arrows),
-                  label: const Text('Compare teams'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                // Center with heightFactor 1 so the bar keeps its intrinsic
+                // height instead of filling the screen.
+                child: Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 688),
+                    child: FilledButton.icon(
+                      onPressed: _a != null && _b != null ? _openMatchup : null,
+                      icon: const Icon(Icons.compare_arrows_rounded),
+                      label: const Text('Compare teams'),
                     ),
                   ),
                 ),
@@ -117,69 +125,71 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
           : null,
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, widget.bottomInset),
           children: [
             if (leagues.length > 1) ...[
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<League>(
-                  showSelectedIcon: false,
-                  segments: [
-                    for (final l in leagues)
-                      ButtonSegment(
-                        value: l,
-                        label: Text(l.label),
-                        tooltip: l.level,
-                      ),
-                  ],
-                  selected: {league},
-                  onSelectionChanged: (s) => _selectLeague(s.first),
-                ),
+              _LeaguePills(
+                leagues: leagues,
+                selected: league,
+                onSelect: _selectLeague,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
             ],
             if (_isMatchup) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: _Slot(
-                      label: 'Team A',
-                      team: _a,
-                      onClear: () => setState(() => _a = null),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Text(
-                      'VS',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w900,
+              StatCard(
+                padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _Slot(
+                        label: 'Team A',
+                        team: _a,
+                        onClear: () => setState(() => _a = null),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: _Slot(
-                      label: 'Team B',
-                      team: _b,
-                      onClear: () => setState(() => _b = null),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.ink,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        'VS',
+                        style: TextStyle(
+                          color: AppColors.onInk,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: _Slot(
+                        label: 'Team B',
+                        team: _b,
+                        onClear: () => setState(() => _b = null),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 12),
             ],
-            Text(
-              _isMatchup
-                  ? 'Tap two ${league.label} teams. Tap a selected team again '
-                      'to remove it.'
-                  : 'Choose a ${league.label} team to see its season.',
-              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                _isMatchup
+                    ? 'Tap two ${league.label} teams. Tap a selected team '
+                          'again to remove it.'
+                    : 'Choose a ${league.label} team to see its season.',
+                style: TextStyle(color: AppColors.muted, fontSize: 13),
+              ),
             ),
             for (final entry in conferences.entries) ...[
               SectionTitle('${entry.key} Conference'),
               StatCard(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Column(
                   children: [
                     for (final team in entry.value)
@@ -202,6 +212,91 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   }
 }
 
+/// League filter: the selected league is a black pill with an icon disc,
+/// the others are white outlined pills.
+class _LeaguePills extends StatelessWidget {
+  const _LeaguePills({
+    required this.leagues,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<League> leagues;
+  final League selected;
+  final ValueChanged<League> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final l in leagues) ...[
+            if (l != leagues.first) const SizedBox(width: 8),
+            Tooltip(
+              message: l.level,
+              child: Material(
+                color: l == selected ? AppColors.ink : AppColors.surface,
+                shape: StadiumBorder(side: BorderSide(color: AppColors.border)),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => onSelect(l),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      l == selected ? 5 : 20,
+                      5,
+                      20,
+                      5,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (l == selected) ...[
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.onInk,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              l.isAmateur
+                                  ? Icons.school_outlined
+                                  : Icons.sports_football,
+                              size: 20,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        SizedBox(
+                          height: 40,
+                          child: Center(
+                            child: Text(
+                              l.label,
+                              style: TextStyle(
+                                color: l == selected
+                                    ? AppColors.onInk
+                                    : AppColors.text,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _Slot extends StatelessWidget {
   const _Slot({required this.label, required this.team, required this.onClear});
 
@@ -212,56 +307,58 @@ class _Slot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = team;
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: t == null ? AppColors.border : teamColor(t),
-          width: t == null ? 1 : 2,
-        ),
-      ),
-      child: t == null
-          ? Center(
-              child: Text(
-                label,
-                style: const TextStyle(color: AppColors.muted),
-              ),
-            )
-          : Row(
-              children: [
-                TeamBadge(team: t, size: 36),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        t.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                      Text(
-                        t.record,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
+    return Column(
+      children: [
+        SizedBox(
+          width: 72,
+          height: 72,
+          child: t == null
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surfaceHigh,
+                    border: Border.all(color: AppColors.border, width: 1.5),
+                  ),
+                  child: Icon(Icons.add_rounded, color: AppColors.muted),
+                )
+              : Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    TeamBadge(team: t, size: 72),
+                    Positioned(
+                      right: -10,
+                      top: -10,
+                      child: IconButton(
+                        tooltip: 'Remove ${t.name}',
+                        onPressed: onClear,
+                        icon: const Icon(Icons.close_rounded, size: 14),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: AppColors.onInk,
+                          minimumSize: const Size.square(26),
+                          fixedSize: const Size.square(26),
+                          padding: EdgeInsets.zero,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Remove ${t.name}',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close, size: 18),
-                ),
-              ],
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          t?.name ?? label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: t == null ? AppColors.muted : AppColors.text,
+          ),
+        ),
+        Text(
+          t?.record ?? 'Pick a team',
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
+        ),
+      ],
     );
   }
 }
@@ -285,32 +382,33 @@ class _TeamRow extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       selected: selected,
-      selectedTileColor: teamColor(team).withValues(alpha: 0.08),
-      leading: TeamBadge(team: team),
+      selectedTileColor: AppColors.surfaceHigh,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: TeamBadge(team: team, size: 46),
       title: Text(
         team.displayName,
-        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.text),
+        style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.text),
       ),
       subtitle: Text(
         '${team.record} · ${team.stat('ppg').toStringAsFixed(1)} PPG · '
         '${team.stat('papg').toStringAsFixed(1)} allowed',
-        style: const TextStyle(color: AppColors.muted, fontSize: 12),
+        style: TextStyle(color: AppColors.muted, fontSize: 12),
       ),
       trailing: selected
           ? CircleAvatar(
-              radius: 14,
-              backgroundColor: teamColor(team),
+              radius: 15,
+              backgroundColor: AppColors.ink,
               child: Text(
                 selectedAs!,
-                style: const TextStyle(
-                  color: Colors.black,
+                style: TextStyle(
+                  color: AppColors.onInk,
                   fontWeight: FontWeight.w900,
                 ),
               ),
             )
           : (showChevron
-              ? const Icon(Icons.chevron_right, color: AppColors.muted)
-              : null),
+                ? Icon(Icons.chevron_right_rounded, color: AppColors.muted)
+                : null),
     );
   }
 }

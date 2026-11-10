@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:statmyteam/data/favorites_store.dart';
+import 'package:statmyteam/data/settings_store.dart';
 import 'package:statmyteam/data/stats_repository.dart';
 import 'package:statmyteam/main.dart';
+import 'package:statmyteam/theme/app_theme.dart';
 import 'package:statmyteam/widgets/stats_widgets.dart';
 
 Future<Widget> _app() async {
@@ -189,5 +191,43 @@ void main() {
     expect(find.text('Favorite teams'), findsOneWidget);
     expect(find.text('Lumberjacks'), findsOneWidget);
     expect(find.textContaining('-'), findsWidgets);
+  });
+
+  testWidgets('settings switches to dark mode and remembers it', (
+    tester,
+  ) async {
+    _tallView(tester);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final favorites = await FavoritesStore.open();
+    await tester.pumpWidget(
+      StatMyTeamApp(
+        repository: StatsRepository.sampleFootball(),
+        favorites: favorites,
+        settings: SettingsStore(prefs),
+        showLogin: false,
+      ),
+    );
+
+    Brightness themeBrightness() =>
+        Theme.of(tester.element(find.byType(Scaffold).last)).brightness;
+    expect(themeBrightness(), Brightness.light);
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Appearance'), findsOneWidget);
+
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+    expect(themeBrightness(), Brightness.dark);
+    expect(AppColors.isDark, isTrue);
+    expect(prefs.getString('theme_mode'), 'dark');
+    // The tab survives the in-place rebuild.
+    expect(find.text('Appearance'), findsOneWidget);
+
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(themeBrightness(), Brightness.light);
+    expect(AppColors.isDark, isFalse);
   });
 }

@@ -5,6 +5,7 @@ import '../logic/football_stats.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
 import 'player_detail_screen.dart';
 
@@ -55,14 +56,22 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
     final colorB = teamColor(widget.teamB);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Compare players')),
+      appBar: const PillAppBar(title: 'Compare players'),
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            const Text(
-              'Position',
-              style: TextStyle(color: AppColors.muted, fontSize: 13),
+            Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Text(
+                'POSITION',
+                style: TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -115,7 +124,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                 ),
               ),
               if (a.position != b.position)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 12),
                   child: Text(
                     'Different positions: stats that only apply to one '
@@ -161,7 +170,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                 ),
               ),
             ] else
-              const StatCard(
+              StatCard(
                 child: Text(
                   'One of these teams has no player listed at this position.',
                   style: TextStyle(color: AppColors.muted),
@@ -204,12 +213,19 @@ class _PlayerPicker extends StatelessWidget {
       key: ValueKey('${team.id}-${value?.id}-${options.length}'),
       initialValue: options.contains(value) ? value : null,
       isExpanded: true,
+      borderRadius: BorderRadius.circular(20),
+      dropdownColor: AppColors.surface,
       decoration: InputDecoration(
         labelText: team.name,
-        labelStyle: TextStyle(color: teamColor(team)),
-        border: const OutlineInputBorder(),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        labelStyle: TextStyle(
+          color: AppColors.muted,
+          fontWeight: FontWeight.w600,
+        ),
+        fillColor: AppColors.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 12,
+        ),
       ),
       items: [
         for (final p in options)
@@ -261,27 +277,28 @@ class _EdgeSummary extends StatelessWidget {
     final total = winsA + winsB;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
+      padding: const EdgeInsets.fromLTRB(6, 24, 6, 12),
       child: Text.rich(
         TextSpan(
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           children: total == 0
               ? [const TextSpan(text: 'No shared stats to compare')]
               : winsA == winsB
-                  ? [TextSpan(text: 'Dead even: $winsA–$winsB in shared stats')]
-                  : [
-                      TextSpan(
-                        text: winsA > winsB ? a.lastName : b.lastName,
-                        style: TextStyle(
-                          color: winsA > winsB ? colorA : colorB,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' leads ${winsA > winsB ? winsA : winsB} of '
-                            '$total categories',
-                      ),
-                    ],
+              ? [TextSpan(text: 'Dead even: $winsA–$winsB in shared stats')]
+              : [
+                  TextSpan(
+                    text: winsA > winsB ? a.lastName : b.lastName,
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  TextSpan(
+                    text:
+                        ' leads ${winsA > winsB ? winsA : winsB} of '
+                        '$total categories',
+                  ),
+                ],
         ),
       ),
     );
