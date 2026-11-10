@@ -2,7 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists favorite teams and matchups locally.
+/// Persists favorite team ids locally.
 class FavoritesStore extends ChangeNotifier {
   FavoritesStore(this._prefs);
 
@@ -20,7 +20,7 @@ class FavoritesStore extends ChangeNotifier {
   Set<String> get ids => Set.unmodifiable(_ids);
   Set<String> get matchupIds => Set.unmodifiable(_matchups);
 
-  /// Make A vs B the same favorite as B vs A.
+  /// Same two teams count as one matchup regardless of order.
   static String matchupKey(String a, String b) {
     final sorted = [a, b]..sort();
     return '${sorted[0]}|${sorted[1]}';
@@ -42,6 +42,7 @@ class FavoritesStore extends ChangeNotifier {
       _matchupKey,
       _matchups.toList()..sort(),
     );
+
     notifyListeners();
   }
 
@@ -58,6 +59,7 @@ class FavoritesStore extends ChangeNotifier {
       _key,
       _ids.toList()..sort(),
     );
+
     notifyListeners();
   }
 
@@ -66,4 +68,3 @@ class FavoritesStore extends ChangeNotifier {
     return FavoritesStore(prefs);
   }
 }
-
