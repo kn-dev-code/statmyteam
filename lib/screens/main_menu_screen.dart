@@ -10,6 +10,7 @@ import '../widgets/stats_widgets.dart';
 import 'team_detail_screen.dart';
 import 'matchup_screen.dart';
 import 'team_select_screen.dart';
+import 'sports_selection_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
   const MainMenuScreen({super.key});
@@ -151,7 +152,7 @@ class MainMenuScreen extends StatelessWidget {
                     'projected to win',
                 highlight: true,
                 onTap: () => open(
-                  const TeamSelectScreen(
+                  const SportsSelectionScreen(
                     mode: TeamSelectMode.matchup,
                   ),
                 ),
@@ -165,7 +166,7 @@ class MainMenuScreen extends StatelessWidget {
                 subtitle:
                     'Season numbers, recent form, roster, and injuries',
                 onTap: () => open(
-                  const TeamSelectScreen(
+                  const SportsSelectionScreen(
                     mode: TeamSelectMode.single,
                   ),
                 ),
