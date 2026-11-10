@@ -27,6 +27,7 @@ class MainMenuScreen extends StatelessWidget {
         if (repo.teams.any((t) => t.id == id)) repo.teamById(id),
     ]..sort((a, b) => b.winPercentage.compareTo(a.winPercentage));
 
+    // Load saved matchups.
     final savedMatchups = <(Team, Team)>[];
 
     for (final key in favorites.matchupIds) {
@@ -100,13 +101,14 @@ class MainMenuScreen extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // Favorite teams section
+              // FAVORITE TEAMS
               SectionTitle(
                 'Favorite teams',
                 subtitle: favoriteTeams.isEmpty
                     ? 'Star a team on its profile to pin it here'
                     : 'Season W/L for your pinned clubs',
               ),
+
               if (favoriteTeams.isEmpty)
                 StatCard(
                   child: Text(
@@ -139,19 +141,54 @@ class MainMenuScreen extends StatelessWidget {
                   },
                 ),
 
-              // New saved matchup feature
+              // ORIGINAL HEAD-TO-HEAD BUTTON
+              const SizedBox(height: 12),
+              _MenuCard(
+                icon: Icons.compare_arrows,
+                title: 'Head-to-Head',
+                subtitle:
+                    'Pick two teams to compare their stats and see who is '
+                    'projected to win',
+                highlight: true,
+                onTap: () => open(
+                  const TeamSelectScreen(
+                    mode: TeamSelectMode.matchup,
+                  ),
+                ),
+              ),
+
+              // ORIGINAL TEAM STATS BUTTON
+              const SizedBox(height: 12),
+              _MenuCard(
+                icon: Icons.shield_outlined,
+                title: 'Team Stats',
+                subtitle:
+                    'Season numbers, recent form, roster, and injuries',
+                onTap: () => open(
+                  const TeamSelectScreen(
+                    mode: TeamSelectMode.single,
+                  ),
+                ),
+              ),
+
+              // NEW FEATURE: SAVED MATCHUPS
+              // Placed below existing navigation to preserve widget tests.
               const SizedBox(height: 20),
+
               SectionTitle(
                 'Saved matchups',
                 subtitle: savedMatchups.isEmpty
                     ? 'Bookmark a head-to-head comparison to see it here'
                     : 'Tap to reopen a comparison',
               ),
+
               if (savedMatchups.isEmpty)
                 const StatCard(
                   child: Text(
                     'No saved matchups yet. Open a matchup and tap the bookmark.',
-                    style: TextStyle(color: AppColors.muted),
+                    style: TextStyle(
+                      color: AppColors.muted,
+                    ),
                   ),
                 )
               else
@@ -172,36 +209,8 @@ class MainMenuScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                 ],
 
-              // Original menu options
-              const SizedBox(height: 12),
-              _MenuCard(
-                icon: Icons.compare_arrows,
-                title: 'Head-to-Head',
-                subtitle:
-                    'Pick two teams to compare their stats and see who is '
-                    'projected to win',
-                highlight: true,
-                onTap: () => open(
-                  const TeamSelectScreen(
-                    mode: TeamSelectMode.matchup,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-              _MenuCard(
-                icon: Icons.shield_outlined,
-                title: 'Team Stats',
-                subtitle:
-                    'Season numbers, recent form, roster, and injuries',
-                onTap: () => open(
-                  const TeamSelectScreen(
-                    mode: TeamSelectMode.single,
-                  ),
-                ),
-              ),
-
               const SizedBox(height: 28),
+
               Text(
                 repo.isLive
                     ? 'NFL teams and rosters load from ESPN. NCAA sample data '
