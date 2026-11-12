@@ -45,4 +45,41 @@ class AppTheme {
       dividerColor: AppColors.border,
     );
   }
+
+static ThemeData light() {
+  const scheme = ColorScheme.light(
+    primary: Color(0xFF00875A),
+    onPrimary: Colors.white,
+    secondary: Color(0xFFB8860B),
+    surface: Color(0xFFFFFFFF),
+    onSurface: Color(0xFF172033),
+    error: Color(0xFFD32F2F),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.light,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: const Color(0xFFF4F7FB),
+    fontFamily: 'Roboto',
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFFF4F7FB),
+      foregroundColor: Color(0xFF172033),
+      elevation: 0,
+      centerTitle: false,
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: Colors.white,
+      contentTextStyle: const TextStyle(
+        color: Color(0xFF172033),
+      ),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+    ),
+    dividerColor: const Color(0xFFD7DFEA),
+  );
+}
+
 }

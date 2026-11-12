@@ -40,7 +40,9 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         if (!snapshot.hasData) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark(),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            themeMode: ThemeMode.dark,
             home: const Scaffold(
               body: Center(
                 child: Column(
@@ -66,7 +68,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   }
 }
 
-class StatMyTeamApp extends StatelessWidget {
+class StatMyTeamApp extends StatefulWidget {
   const StatMyTeamApp({
     super.key,
     required this.repository,
@@ -80,16 +82,34 @@ class StatMyTeamApp extends StatelessWidget {
   /// Widget tests skip auth and land on the main menu.
   final bool showLogin;
 
+@override
+State<StatMyTeamApp> createState() => _StatMyTeamAppState();
+}
+
+class _StatMyTeamAppState extends State<StatMyTeamApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void toggleTheme() {
+  setState(() {
+    _themeMode = _themeMode == ThemeMode.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
+  });
+
+  debugPrint('Theme changed to: $_themeMode');
+}
+
   @override
   Widget build(BuildContext context) {
     return FavoritesScope(
-      store: favorites,
+      store: widget.favorites,
       child: StatsScope(
-        repository: repository,
+        repository: widget.repository,
         child: MaterialApp(
           title: 'StatMyTeam',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.dark().copyWith(
+          theme: AppTheme.light(),
+darkTheme: AppTheme.dark().copyWith(
             inputDecorationTheme: InputDecorationTheme(
               filled: true,
               fillColor: AppColors.surfaceHigh,
@@ -107,7 +127,14 @@ class StatMyTeamApp extends StatelessWidget {
               ),
             ),
           ),
-          home: showLogin ? const LoginScreen() : const MainMenuScreen(),
+          themeMode: _themeMode,
+          home: widget.showLogin
+    ? LoginScreen(
+        onToggleTheme: toggleTheme,
+      )
+    : MainMenuScreen(
+        onToggleTheme: toggleTheme,
+      ),
         ),
       ),
     );

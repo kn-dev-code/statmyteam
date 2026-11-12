@@ -13,7 +13,12 @@ import 'team_select_screen.dart';
 import 'sports_selection_screen.dart';
 
 class MainMenuScreen extends StatelessWidget {
-  const MainMenuScreen({super.key});
+  const MainMenuScreen({
+    super.key,
+    this.onToggleTheme,
+  });
+
+  final VoidCallback? onToggleTheme;
 
   @override
   Widget build(BuildContext context) {
@@ -49,18 +54,27 @@ class MainMenuScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('StatMyTeam'),
-        actions: [
-          IconButton(
-            tooltip: 'Search teams and players',
-            icon: const Icon(Icons.search),
-            onPressed: () => showSearch(
-              context: context,
-              delegate: StatsSearchDelegate(),
-            ),
-          ),
-        ],
+  title: const Text('StatMyTeam'),
+  actions: [
+    IconButton(
+      tooltip: 'Toggle light/dark mode',
+      icon: Icon(
+        Theme.of(context).brightness == Brightness.dark
+            ? Icons.light_mode
+            : Icons.dark_mode,
       ),
+      onPressed: onToggleTheme,
+    ),
+    IconButton(
+      tooltip: 'Search teams and players',
+      icon: const Icon(Icons.search),
+      onPressed: () => showSearch(
+        context: context,
+        delegate: StatsSearchDelegate(),
+      ),
+    ),
+  ],
+),
       body: SafeArea(
         child: ContentWidth(
           child: ListView(
