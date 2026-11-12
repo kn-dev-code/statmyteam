@@ -103,7 +103,22 @@ class StatsRepository {
   /// Newest first.
   final List<GameStats> games;
 
-  Team teamById(String id) => teams.firstWhere((team) => team.id == id);
+  /// Returns the team for [id], or `null` when it is not in the dataset.
+  Team? findTeamById(String id) {
+    for (final team in teams) {
+      if (team.id == id) return team;
+    }
+    return null;
+  }
+
+  /// Same as [findTeamById], but throws a clear [StateError] when missing.
+  Team teamById(String id) {
+    final team = findTeamById(id);
+    if (team == null) {
+      throw StateError('Unknown team id: $id');
+    }
+    return team;
+  }
 
   /// Sports that have at least one team, in [Sport] order.
   List<Sport> get sports => [

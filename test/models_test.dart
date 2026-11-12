@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:statmyteam/data/stats_repository.dart';
 import 'package:statmyteam/models/models.dart';
 
 void main() {
@@ -83,4 +84,12 @@ void main() {
       expect(decoded.playerBoxScores.single.playerId, 'lebron');
     });
   });
+
+  test('findTeamById returns null for unknown ids', () {
+    final repo = StatsRepository.sampleFootball();
+    expect(repo.findTeamById('por'), isNotNull);
+    expect(repo.findTeamById('missing-team'), isNull);
+    expect(() => repo.teamById('missing-team'), throwsStateError);
+  });
+
 }

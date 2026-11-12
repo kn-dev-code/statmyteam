@@ -178,12 +178,7 @@ class _PlayerResultTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Team? team;
-    try {
-      team = StatsScope.of(context).teamById(player.teamId);
-    } catch (_) {
-      team = null;
-    }
+    final team = StatsScope.of(context).findTeamById(player.teamId);
 
     return ListTile(
       leading: CircleAvatar(

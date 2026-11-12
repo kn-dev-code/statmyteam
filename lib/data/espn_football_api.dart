@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
@@ -419,7 +420,13 @@ class EspnFootballApi {
   Future<Map<String, dynamic>?> _soft(Future<Map<String, dynamic>> future) async {
     try {
       return await future;
-    } catch (_) {
+    } catch (error, stack) {
+      developer.log(
+        'ESPN soft request failed',
+        name: 'EspnFootballApi',
+        error: error,
+        stackTrace: stack,
+      );
       return null;
     }
   }

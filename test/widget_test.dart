@@ -90,6 +90,8 @@ void main() {
         ),
       );
 
+      expect(find.byKey(const Key('demo_auth_banner')), findsOneWidget);
+      expect(find.textContaining('Demo mode'), findsOneWidget);
       expect(find.text('Email'), findsOneWidget);
       expect(find.text('Password'), findsOneWidget);
       expect(find.text('Continue with Google'), findsOneWidget);

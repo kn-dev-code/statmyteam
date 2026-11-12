@@ -32,7 +32,7 @@ typedef _Boot = ({
 });
 
 class _BootstrapAppState extends State<_BootstrapApp> {
-  late final Future<_Boot> _boot = _load();
+  late Future<_Boot> _boot = _load();
 
   Future<_Boot> _load() async {
     final favorites = FavoritesStore.open();
@@ -51,11 +51,53 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     return FutureBuilder<_Boot>(
       future: _boot,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          AppColors.use(
-            WidgetsBinding.instance.platformDispatcher.platformBrightness,
-          );
+        AppColors.use(
+          WidgetsBinding.instance.platformDispatcher.platformBrightness,
+        );
 
+        if (snapshot.hasError) {
+          final message = snapshot.error.toString();
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.dark(),
+            home: Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 40),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Could not start StatMyTeam',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: () => setState(() {
+                          _boot = _load();
+                        }),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: AppTheme.dark(),
@@ -194,29 +236,28 @@ class _StatMyTeamAppState extends State<StatMyTeamApp>
             debugShowCheckedModeBanner: false,
 
             theme: AppTheme.current().copyWith(
-              
-inputDecorationTheme: InputDecorationTheme(
-  filled: true,
-  fillColor: AppColors.surfaceHigh,
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide(
-      color: AppColors.border,
-    ),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide(
-      color: AppColors.border,
-    ),
-  ),
-  focusedBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide(
-      color: AppColors.accent,
-    ),
-  ),
-),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: AppColors.surfaceHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppColors.border,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppColors.border,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
             ),
             home: widget.showLogin
                 ? const LoginScreen()
