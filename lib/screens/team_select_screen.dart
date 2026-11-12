@@ -249,6 +249,39 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: Row(
+                    children: [
+                      Icon(
+                        _a != null && _b != null
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.info_outline_rounded,
+                        size: 18,
+                        color: AppColors.muted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _a == null && _b == null
+                              ? '0 of 2 teams selected — choose Team A.'
+                              : _a != null && _b != null
+                                  ? '2 of 2 teams selected — ready to compare.'
+                                  : _a == null
+                                      ? '1 of 2 teams selected — choose Team A.'
+                                      : '1 of 2 teams selected — choose Team B.',
+                          key: const ValueKey('matchup_selection_status'),
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
               ],
 
               Padding(
