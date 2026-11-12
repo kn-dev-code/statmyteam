@@ -77,6 +77,13 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
     });
   }
 
+  void _clearSelection() {
+    setState(() {
+      _a = null;
+      _b = null;
+    });
+  }
+
   void _openMatchup() {
     if (_a == null || _b == null) return;
 
@@ -158,14 +165,29 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                   heightFactor: 1,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 688),
-                    child: FilledButton.icon(
-                      onPressed: _a != null && _b != null
-                          ? _openMatchup
-                          : null,
-                      icon: const Icon(
-                        Icons.compare_arrows_rounded,
-                      ),
-                      label: const Text('Compare teams'),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_a != null || _b != null) ...[
+                          TextButton.icon(
+                            key: const ValueKey('clear_matchup_selection'),
+                            onPressed: _clearSelection,
+                            icon: const Icon(Icons.restart_alt_rounded),
+                            label: const Text('Clear selection'),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                        FilledButton.icon(
+                          onPressed: _a != null && _b != null
+                              ? _openMatchup
+                              : null,
+                          icon: const Icon(
+                            Icons.compare_arrows_rounded,
+                          ),
+                          label: const Text('Compare teams'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
