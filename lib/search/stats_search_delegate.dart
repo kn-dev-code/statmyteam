@@ -13,7 +13,7 @@ class StatsSearchDelegate extends SearchDelegate<void> {
 
   @override
   String get searchFieldLabel => 'Search teams or players';
-
+  
   @override
   ThemeData appBarTheme(BuildContext context) {
     final base = Theme.of(context);
