@@ -84,14 +84,32 @@ class _Results extends StatelessWidget {
           team.name.toLowerCase().contains(q);
     }).toList();
 
-    final players = repo.players
-        .where((player) {
-          return player.fullName.toLowerCase().contains(q) ||
-              player.lastName.toLowerCase().contains(q) ||
-              '#${player.jerseyNumber}'.contains(q);
-        })
-        .take(40)
-        .toList();
+  // Normalize spacing so "Jordan   Vance" matches "Jordan Vance".
+final normalizedQuery = q.replaceAll(RegExp(r'\s+'), ' ');
+
+// Treat "#1" and "1" as exact jersey-number searches.
+final jerseyMatch =
+    RegExp(r'^#?(\d+)$').firstMatch(normalizedQuery);
+
+final jerseyNumber = jerseyMatch == null
+    ? null
+    : int.tryParse(jerseyMatch.group(1)!);
+
+final players = repo.players
+    .where((player) {
+      if (jerseyNumber != null) {
+        return player.jerseyNumber == jerseyNumber;
+      }
+
+      final normalizedName = player.fullName
+          .toLowerCase()
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+
+      return normalizedName.contains(normalizedQuery);
+    })
+    .take(40)
+    .toList();
 
     if (teams.isEmpty && players.isEmpty) {
       return Center(
