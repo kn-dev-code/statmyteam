@@ -252,6 +252,62 @@ void main() {
   );
 
   testWidgets(
+    'head-to-head selection status updates for both teams',
+    (tester) async {
+      _tallView(tester);
+      await tester.pumpWidget(await _app());
+      await _tapText(tester, 'Head-to-Head');
+      await _selectFootball(tester);
+
+      final compare = find.widgetWithText(FilledButton, 'Compare teams');
+      final status = find.byKey(const ValueKey('matchup_selection_status'));
+
+      expect(status, findsOneWidget);
+      expect(find.text('0 of 2 teams selected — choose Team A.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(compare).onPressed, isNull);
+      expect(find.byKey(const ValueKey('clear_matchup_selection')), findsNothing);
+
+      await _tapText(tester, 'Portland Lumberjacks');
+      expect(find.text('1 of 2 teams selected — choose Team B.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(compare).onPressed, isNull);
+
+      await _tapText(tester, 'Austin Stampede');
+      expect(find.text('2 of 2 teams selected — ready to compare.'), findsOneWidget);
+      expect(tester.widget<FilledButton>(compare).onPressed, isNotNull);
+      expect(find.byKey(const ValueKey('clear_matchup_selection')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'clear selection resets both matchup picks and disables comparison',
+    (tester) async {
+      _tallView(tester);
+      await tester.pumpWidget(await _app());
+      await _tapText(tester, 'Head-to-Head');
+      await _selectFootball(tester);
+
+      await _tapText(tester, 'Portland Lumberjacks');
+      await _tapText(tester, 'Austin Stampede');
+
+      final compare = find.widgetWithText(FilledButton, 'Compare teams');
+      expect(tester.widget<FilledButton>(compare).onPressed, isNotNull);
+
+      await tester.tap(find.byKey(const ValueKey('clear_matchup_selection')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('0 of 2 teams selected — choose Team A.'), findsOneWidget);
+      expect(find.text('Team A'), findsOneWidget);
+      expect(find.text('Team B'), findsOneWidget);
+      expect(tester.widget<FilledButton>(compare).onPressed, isNull);
+      expect(find.byKey(const ValueKey('clear_matchup_selection')), findsNothing);
+
+      // Selection can start again after resetting both teams.
+      await _tapText(tester, 'Portland Lumberjacks');
+      expect(find.text('1 of 2 teams selected — choose Team B.'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'switching league clears head-to-head picks',
     (tester) async {
       _tallView(tester);
