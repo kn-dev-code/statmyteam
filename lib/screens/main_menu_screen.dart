@@ -11,6 +11,7 @@ import '../widgets/stats_widgets.dart';
 import 'settings_tab.dart';
 import 'team_detail_screen.dart';
 import 'team_select_screen.dart';
+import 'upcoming_games_screen.dart';
 
 /// App home: a floating pill nav over three tabs (Home, Teams, Saved).
 class MainMenuScreen extends StatefulWidget {
@@ -272,6 +273,37 @@ class _HomeTab extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            StatCard(
+              padding: EdgeInsets.zero,
+              child: ListTile(
+                onTap: () => _open(context, const UpcomingGamesScreen()),
+                leading: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surfaceHigh,
+                  ),
+                  child: Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.ink,
+                  ),
+                ),
+                title: const Text(
+                  'Upcoming games',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(
+                  'Choose a scheduled game to compare both teams instantly',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                ),
+                trailing: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppColors.muted,
+                ),
               ),
             ),
             SectionTitle(

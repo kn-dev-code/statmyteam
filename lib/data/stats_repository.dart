@@ -123,4 +123,27 @@ class StatsRepository {
           ((g.homeTeamId == a && g.awayTeamId == b) ||
               (g.homeTeamId == b && g.awayTeamId == a)))
       .toList();
+
+  /// Scheduled games that have not started yet, earliest first.
+  List<GameStats> upcomingGames({
+    Sport? sport,
+    League? league,
+    DateTime? now,
+  }) {
+    final cutoff = (now ?? DateTime.now()).toUtc();
+    final teamsById = {for (final team in teams) team.id: team};
+    final upcoming = games.where((game) {
+      if (game.status != GameStatus.scheduled ||
+          !game.startTime.isAfter(cutoff) ||
+          (sport != null && game.sport != sport)) {
+        return false;
+      }
+      final home = teamsById[game.homeTeamId];
+      final away = teamsById[game.awayTeamId];
+      if (home == null || away == null) return false;
+      return league == null || (home.league == league && away.league == league);
+    }).toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    return upcoming;
+  }
 }
