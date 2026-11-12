@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../logic/football_stats.dart';
 import '../logic/matchup_projector.dart';
+import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
+import '../widgets/team_outlook_card.dart';
 import 'player_compare_screen.dart';
 
 /// Two teams side by side with a win projection.
@@ -207,11 +208,22 @@ class _MatchupScreenState extends State<MatchupScreen> {
             StatCard(
               padding: const EdgeInsets.fromLTRB(8, 10, 8, 14),
               child: StatDuelGrid(
-                defs: FootballStats.teamStats,
+                defs: SportStats.teamStats(a.sport),
                 valuesA: a.seasonStats,
                 valuesB: b.seasonStats,
               ),
             ),
+
+            SectionTitle(
+              '${a.abbreviation} outlook',
+              subtitle: 'How ${a.name} grades against the ${a.league?.label ?? 'league'}',
+            ),
+            TeamOutlookCard(outlook: TeamOutlook.analyze(a, repo.peersOf(a))),
+            SectionTitle(
+              '${b.abbreviation} outlook',
+              subtitle: 'How ${b.name} grades against the ${b.league?.label ?? 'league'}',
+            ),
+            TeamOutlookCard(outlook: TeamOutlook.analyze(b, repo.peersOf(b))),
 
             const SectionTitle(
               'What drives the projection',

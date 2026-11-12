@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../logic/football_stats.dart';
+import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
+import '../widgets/team_outlook_card.dart';
 import 'player_detail_screen.dart';
 import 'team_select_screen.dart';
 
@@ -25,6 +27,8 @@ class TeamDetailScreen extends StatelessWidget {
     final injuries = repo.injuryReport(team.id);
     final recent = repo.recentGames(team.id);
     final isFavorite = favorites.isFavorite(team.id);
+    final outlook = TeamOutlook.analyze(team, repo.peersOf(team));
+    final teamStats = SportStats.teamStats(team.sport);
 
     return Scaffold(
       appBar: PillAppBar(
@@ -111,6 +115,7 @@ class TeamDetailScreen extends StatelessWidget {
                         builder: (_) => TeamSelectScreen(
                           mode: TeamSelectMode.matchup,
                           preselected: team,
+                          sport: team.sport,
                         ),
                       ),
                     ),
@@ -120,11 +125,16 @@ class TeamDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SectionTitle(
+              'Strengths & weaknesses',
+              subtitle: 'Ranked against the rest of the league',
+            ),
+            TeamOutlookCard(outlook: outlook),
             const SectionTitle('Season stats'),
             StatCard(
               child: StatGrid(
                 items: [
-                  for (final def in FootballStats.teamStats)
+                  for (final def in teamStats)
                     (label: def.label, value: def.format(team.stat(def.key))),
                 ],
               ),
@@ -172,12 +182,11 @@ class TeamDetailScreen extends StatelessWidget {
                 ),
               ),
             const SectionTitle('Roster', subtitle: 'Tap a player for details'),
-            for (final group in PositionGroup.values)
-              if (roster.any((p) => group.positions.contains(p.position))) ...[
+            for (final section in _rosterSections(team.sport, roster)) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
                   child: Text(
-                    group.label.toUpperCase(),
+                    section.label.toUpperCase(),
                     style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 11,
@@ -190,9 +199,7 @@ class TeamDetailScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
                     children: [
-                      for (final p in roster)
-                        if (group.positions.contains(p.position))
-                          _PlayerTile(player: p),
+                      for (final p in section.players) _PlayerTile(player: p),
                     ],
                   ),
                 ),
@@ -206,6 +213,36 @@ class TeamDetailScreen extends StatelessWidget {
   static String _signed(double v) {
     final text = v.toStringAsFixed(1);
     return v > 0 ? '+$text' : text;
+  }
+
+  static List<({String label, List<Player> players})> _rosterSections(
+    Sport sport,
+    List<Player> roster,
+  ) {
+    if (sport == Sport.football) {
+      return [
+        for (final group in PositionGroup.values)
+          if (roster.any((p) => group.positions.contains(p.position)))
+            (
+              label: group.label,
+              players: [
+                for (final p in roster)
+                  if (group.positions.contains(p.position)) p,
+              ],
+            ),
+      ];
+    }
+    final grouped = <String, List<Player>>{};
+    for (final player in roster) {
+      grouped.putIfAbsent(player.position, () => []).add(player);
+    }
+    return [
+      for (final entry in grouped.entries)
+        (
+          label: SportStats.positionName(sport, entry.key),
+          players: entry.value,
+        ),
+    ];
   }
 }
 

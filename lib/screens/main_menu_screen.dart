@@ -11,10 +11,14 @@ import '../widgets/stats_widgets.dart';
 import 'settings_tab.dart';
 import 'team_detail_screen.dart';
 import 'team_select_screen.dart';
+import 'upcoming_games_screen.dart';
+import 'sports_selection_screen.dart';
 
 /// App home: a floating pill nav over three tabs (Home, Teams, Saved).
 class MainMenuScreen extends StatefulWidget {
-  const MainMenuScreen({super.key});
+  const MainMenuScreen({super.key, this.onToggleTheme});
+
+  final VoidCallback? onToggleTheme;
 
   @override
   State<MainMenuScreen> createState() => _MainMenuScreenState();
@@ -37,7 +41,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Only the visible tab is built so text finders and semantics see one
     // copy of shared sections like "Favorite teams".
     final body = switch (_tab) {
-      0 => _HomeTab(onViewSaved: () => _select(2)),
+      0 => _HomeTab(
+        onViewSaved: () => _select(2),
+        onOpenSettings: () => _select(3),
+        onToggleTheme: widget.onToggleTheme,
+      ),
       1 => const TeamSelectScreen(
         mode: TeamSelectMode.single,
         bottomInset: FloatingNavBar.clearance,
@@ -139,9 +147,15 @@ class _Wordmark extends StatelessWidget {
 }
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab({required this.onViewSaved});
+  const _HomeTab({
+    required this.onViewSaved,
+    required this.onOpenSettings,
+    this.onToggleTheme,
+  });
 
   final VoidCallback onViewSaved;
+  final VoidCallback onOpenSettings;
+  final VoidCallback? onToggleTheme;
 
   @override
   Widget build(BuildContext context) {
@@ -186,12 +200,19 @@ class _HomeTab extends StatelessWidget {
               tooltip: 'New head-to-head',
               onPressed: () => _open(
                 context,
-                const TeamSelectScreen(mode: TeamSelectMode.matchup),
+                const SportsSelectionScreen(mode: TeamSelectMode.matchup),
               ),
             ),
           ],
         ),
         actions: [
+          RoundIconButton(
+            icon: Icons.brightness_6_outlined,
+            tooltip: onToggleTheme == null
+                ? 'Open theme settings'
+                : 'Toggle light/dark mode',
+            onPressed: onToggleTheme ?? onOpenSettings,
+          ),
           RoundIconButton(
             icon: Icons.search_rounded,
             tooltip: 'Search teams and players',
@@ -255,7 +276,7 @@ class _HomeTab extends StatelessWidget {
                       dark: true,
                       onTap: () => _open(
                         context,
-                        const TeamSelectScreen(mode: TeamSelectMode.matchup),
+                        const SportsSelectionScreen(mode: TeamSelectMode.matchup),
                       ),
                     ),
                   ),
@@ -267,11 +288,42 @@ class _HomeTab extends StatelessWidget {
                       subtitle: 'Season numbers, form, roster, and injuries',
                       onTap: () => _open(
                         context,
-                        const TeamSelectScreen(mode: TeamSelectMode.single),
+                        const SportsSelectionScreen(mode: TeamSelectMode.single),
                       ),
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            StatCard(
+              padding: EdgeInsets.zero,
+              child: ListTile(
+                onTap: () => _open(context, const UpcomingGamesScreen()),
+                leading: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surfaceHigh,
+                  ),
+                  child: Icon(
+                    Icons.calendar_month_rounded,
+                    color: AppColors.ink,
+                  ),
+                ),
+                title: const Text(
+                  'Upcoming games',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(
+                  'Choose a scheduled game to compare both teams instantly',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                ),
+                trailing: Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppColors.muted,
+                ),
               ),
             ),
             SectionTitle(
@@ -311,8 +363,8 @@ class _HomeTab extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               repo.isLive
-                  ? 'NFL teams and rosters load from ESPN. NCAA sample data '
-                        'remains available for college browsing.'
+                  ? 'NFL teams and rosters load from ESPN. NCAA, NBA, and MLS '
+                        'sample data remains available for browsing.'
                   : 'Sample league data: teams and players are fictional '
                         'while testing.',
               textAlign: TextAlign.center,

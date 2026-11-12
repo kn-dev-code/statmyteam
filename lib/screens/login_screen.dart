@@ -4,12 +4,18 @@ import '../theme/app_theme.dart';
 import '../widgets/stats_widgets.dart';
 import 'main_menu_screen.dart';
 
-/// Email / password sign-in plus SSO entry points.
+/// Demo sign-in UI for the app shell.
 ///
-/// Auth providers are stubbed for now: a successful form submit or SSO tap
-/// continues into the app so the UI flow can be exercised end-to-end.
+/// Credentials and SSO buttons are **not** verified against a backend. They
+/// only gate entry into the demo experience so flows can be exercised
+/// end-to-end. Prefer [Continue as guest] when no form fill is needed.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.onToggleTheme,
+  });
+
+  final VoidCallback? onToggleTheme;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -34,8 +40,26 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = true);
     await Future<void>.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
+
+    final isGuest = method == 'guest';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isGuest
+              ? 'Continuing in demo mode (no account).'
+              : 'Demo sign-in only — credentials are not verified.',
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const MainMenuScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => MainMenuScreen(
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ),
     );
   }
 
@@ -80,10 +104,45 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Sign in to save favorites and sync your matchups.',
+                'Browse live and sample team stats. Sign-in is demo-only.',
                 style: TextStyle(color: AppColors.muted, fontSize: 15),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
+              Semantics(
+                liveRegion: true,
+                child: StatCard(
+                  key: const Key('demo_auth_banner'),
+                  color: AppColors.gold.withValues(alpha: 0.16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: AppColors.gold,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Demo mode: email, Google, and Apple do not verify '
+                          'accounts or store passwords. Use Continue as guest '
+                          'for the same access.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.text,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               StatCard(
                 padding: const EdgeInsets.all(20),
                 child: Form(
@@ -148,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   color: AppColors.onInk,
                                 ),
                               )
-                            : const Text('Sign in'),
+                            : const Text('Sign in (demo)'),
                       ),
                     ],
                   ),

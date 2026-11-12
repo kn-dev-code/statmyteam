@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../logic/football_stats.dart';
+import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -15,7 +15,7 @@ class PlayerDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final team = StatsScope.of(context).teamById(player.teamId);
-    final stats = FootballStats.forPosition(player.position);
+    final stats = SportStats.forPosition(player.sport, player.position);
     final color = teamColor(team);
 
     return Scaffold(
@@ -125,7 +125,7 @@ class PlayerSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            FootballStats.positionNames[player.position] ?? player.position,
+            SportStats.positionName(player.sport, player.position),
             style: TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 10),

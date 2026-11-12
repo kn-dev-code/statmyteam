@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 
@@ -21,7 +22,10 @@ class EspnFootballApi {
   /// Fetches NFL teams, rosters, recent completed games, and season averages.
   Future<({List<Team> teams, List<Player> players, List<GameStats> games})>
       fetchLeague() async {
-    final seasonYear = await _currentSeasonYear();
+    final scoreboard = await _getJson('$_siteBase/scoreboard');
+    final year =
+        (scoreboard['season'] as Map<String, dynamic>?)?['year'];
+    final seasonYear = year is num ? year.toInt() : DateTime.now().year;
     final season = '$seasonYear';
 
     final conferenceByTeam = await _conferencesByTeamId();
@@ -53,20 +57,17 @@ class EspnFootballApi {
       }
     }
 
+    // Team schedule feeds can omit future events. The scoreboard is the
+    // canonical current-week slate, so merge it in to power Upcoming Games.
+    for (final game in _parseSchedule(scoreboard, season: season)) {
+      gamesById.putIfAbsent(game.id, () => game);
+    }
+
     return (
       teams: teams,
       players: players,
       games: gamesById.values.toList(),
     );
-  }
-
-  Future<int> _currentSeasonYear() async {
-    final json = await _getJson('$_siteBase/scoreboard');
-    final season = json['season'];
-    if (season is Map && season['year'] != null) {
-      return (season['year'] as num).toInt();
-    }
-    return DateTime.now().year;
   }
 
   Future<Map<String, String>> _conferencesByTeamId() async {
@@ -345,12 +346,18 @@ class EspnFootballApi {
           eventMap['competitions'] as List<dynamic>? ?? const [];
       if (competitions.isEmpty) continue;
       final comp = competitions.first as Map<String, dynamic>;
-      final statusName =
-          comp['status']?['type']?['name'] as String? ?? '';
+      final statusType =
+          (comp['status'] as Map<String, dynamic>?)?['type']
+              as Map<String, dynamic>? ??
+          const <String, dynamic>{};
+      final statusName = statusType['name'] as String? ?? '';
+      final statusState = statusType['state'] as String? ?? '';
       final completed =
-          comp['status']?['type']?['completed'] == true ||
+          statusType['completed'] == true ||
               statusName == 'STATUS_FINAL';
-      if (!completed) continue;
+      final live = statusState == 'in' ||
+          statusName == 'STATUS_IN_PROGRESS' ||
+          statusName == 'STATUS_HALFTIME';
 
       final competitors =
           comp['competitors'] as List<dynamic>? ?? const [];
@@ -382,6 +389,7 @@ class EspnFootballApi {
       final start = DateTime.tryParse(eventMap['date'] as String? ?? '') ??
           DateTime.tryParse(comp['date'] as String? ?? '') ??
           DateTime.now();
+      if (!completed && !live && !start.isAfter(DateTime.now())) continue;
 
       games.add(
         GameStats(
@@ -394,7 +402,9 @@ class EspnFootballApi {
           home: TeamBoxScore(teamId: homeId, score: scoreOf(home)),
           away: TeamBoxScore(teamId: awayId, score: scoreOf(away)),
           venue: venue,
-          status: GameStatus.completed,
+          status: completed
+              ? GameStatus.completed
+              : (live ? GameStatus.live : GameStatus.scheduled),
         ),
       );
     }
@@ -410,7 +420,13 @@ class EspnFootballApi {
   Future<Map<String, dynamic>?> _soft(Future<Map<String, dynamic>> future) async {
     try {
       return await future;
-    } catch (_) {
+    } catch (error, stack) {
+      developer.log(
+        'ESPN soft request failed',
+        name: 'EspnFootballApi',
+        error: error,
+        stackTrace: stack,
+      );
       return null;
     }
   }

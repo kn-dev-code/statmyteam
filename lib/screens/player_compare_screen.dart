@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/stats_repository.dart';
 import '../logic/football_stats.dart';
+import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -26,18 +27,42 @@ class PlayerCompareScreen extends StatefulWidget {
 
 class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
   PositionGroup _group = PositionGroup.quarterback;
+  String? _position;
   Player? _a;
   Player? _b;
+
+  bool get _isFootball => widget.teamA.sport == Sport.football;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_a == null && _b == null) _selectDefaults(StatsScope.of(context));
+    final repo = StatsScope.of(context);
+    _position ??= _positions(repo).firstOrNull;
+    if (_a == null && _b == null) _selectDefaults(repo);
+  }
+
+  List<String> _positions(StatsRepository repo) {
+    final seen = <String>{};
+    return [
+      for (final team in [widget.teamA, widget.teamB])
+        for (final player in repo.rosterFor(team.id))
+          if (seen.add(player.position)) player.position,
+    ];
+  }
+
+  List<Player> _options(StatsRepository repo, Team team) {
+    if (_isFootball) return repo.rosterInGroup(team.id, _group);
+    final position = _position;
+    if (position == null) return const [];
+    return [
+      for (final player in repo.rosterFor(team.id))
+        if (player.position == position) player,
+    ];
   }
 
   /// Starters first, so switching groups lines up the likely matchup.
   Player? _defaultFor(StatsRepository repo, Team team) {
-    final group = repo.rosterInGroup(team.id, _group);
+    final group = _options(repo, team);
     if (group.isEmpty) return null;
     return group.firstWhere((p) => p.isStarter, orElse: () => group.first);
   }
@@ -78,15 +103,26 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final group in PositionGroup.values)
-                  ChoiceChip(
-                    label: Text(group.shortLabel),
-                    selected: _group == group,
-                    onSelected: (_) => setState(() {
-                      _group = group;
-                      _selectDefaults(repo);
-                    }),
-                  ),
+                if (_isFootball)
+                  for (final group in PositionGroup.values)
+                    ChoiceChip(
+                      label: Text(group.shortLabel),
+                      selected: _group == group,
+                      onSelected: (_) => setState(() {
+                        _group = group;
+                        _selectDefaults(repo);
+                      }),
+                    )
+                else
+                  for (final position in _positions(repo))
+                    ChoiceChip(
+                      label: Text(position),
+                      selected: _position == position,
+                      onSelected: (_) => setState(() {
+                        _position = position;
+                        _selectDefaults(repo);
+                      }),
+                    ),
               ],
             ),
             const SizedBox(height: 16),
@@ -95,7 +131,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                 Expanded(
                   child: _PlayerPicker(
                     team: widget.teamA,
-                    options: repo.rosterInGroup(widget.teamA.id, _group),
+                    options: _options(repo, widget.teamA),
                     value: a,
                     onChanged: (p) => setState(() => _a = p),
                   ),
@@ -104,7 +140,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                 Expanded(
                   child: _PlayerPicker(
                     team: widget.teamB,
-                    options: repo.rosterInGroup(widget.teamB.id, _group),
+                    options: _options(repo, widget.teamB),
                     value: b,
                     onChanged: (p) => setState(() => _b = p),
                   ),
@@ -158,7 +194,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                         ],
                       ),
                     ),
-                    for (final def in FootballStats.forComparison(a, b))
+                    for (final def in SportStats.forComparison(a, b))
                       StatCompareRow(
                         def: def,
                         valueA: a.seasonStats[def.key],
@@ -263,7 +299,7 @@ class _EdgeSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     var winsA = 0;
     var winsB = 0;
-    for (final def in FootballStats.forComparison(a, b)) {
+    for (final def in SportStats.forComparison(a, b)) {
       if (def.key == 'gp') continue;
       final va = a.seasonStats[def.key];
       final vb = b.seasonStats[def.key];
