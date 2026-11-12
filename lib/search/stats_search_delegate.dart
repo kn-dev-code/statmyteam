@@ -19,10 +19,12 @@ class StatsSearchDelegate extends SearchDelegate<void> {
     final base = Theme.of(context);
     return base.copyWith(
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.surface,
         foregroundColor: AppColors.text,
+        surfaceTintColor: Colors.transparent,
       ),
-      inputDecorationTheme: const InputDecorationTheme(
+      inputDecorationTheme: InputDecorationTheme(
+        filled: false,
         border: InputBorder.none,
         hintStyle: TextStyle(color: AppColors.muted),
       ),
@@ -67,7 +69,7 @@ class _Results extends StatelessWidget {
     final repo = StatsScope.of(context);
     final q = query.trim().toLowerCase();
     if (q.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           'Type a team or player name',
           style: TextStyle(color: AppColors.muted),
@@ -82,42 +84,44 @@ class _Results extends StatelessWidget {
           team.name.toLowerCase().contains(q);
     }).toList();
 
-    final players = repo.players.where((player) {
-      return player.fullName.toLowerCase().contains(q) ||
-          player.lastName.toLowerCase().contains(q) ||
-          '#${player.jerseyNumber}'.contains(q);
-    }).take(40).toList();
+    final players = repo.players
+        .where((player) {
+          return player.fullName.toLowerCase().contains(q) ||
+              player.lastName.toLowerCase().contains(q) ||
+              '#${player.jerseyNumber}'.contains(q);
+        })
+        .take(40)
+        .toList();
 
     if (teams.isEmpty && players.isEmpty) {
       return Center(
         child: Text(
           'No matches for "$query"',
-          style: const TextStyle(color: AppColors.muted),
+          style: TextStyle(color: AppColors.muted),
         ),
       );
     }
 
     return ContentWidth(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           if (teams.isNotEmpty) ...[
             const SectionTitle('Teams'),
             StatCard(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
                 children: [
                   for (final team in teams)
                     ListTile(
-                      leading: TeamBadge(team: team, size: 36),
-                      title: Text(team.displayName,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      leading: TeamBadge(team: team, size: 42),
+                      title: Text(
+                        team.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
                       subtitle: Text(
                         '${team.record} · ${team.conference ?? team.league?.label ?? ''}',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: AppColors.muted, fontSize: 12),
                       ),
                       onTap: () {
                         Navigator.of(context).push(
@@ -134,7 +138,7 @@ class _Results extends StatelessWidget {
           if (players.isNotEmpty) ...[
             const SectionTitle('Players'),
             StatCard(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
                 children: [
                   for (final player in players)
@@ -180,7 +184,7 @@ class _PlayerResultTile extends StatelessWidget {
           '#${player.jerseyNumber}',
           if (team != null) team.abbreviation,
         ].join(' · '),
-        style: const TextStyle(color: AppColors.muted, fontSize: 12),
+        style: TextStyle(color: AppColors.muted, fontSize: 12),
       ),
       onTap: () {
         Navigator.of(context).push(

@@ -1,85 +1,342 @@
+
 import 'package:flutter/material.dart';
 
-class AppColors {
-  static const background = Color(0xFF070B14);
-  static const surface = Color(0xFF121826);
-  static const surfaceHigh = Color(0xFF1A2333);
-  static const border = Color(0xFF2A3548);
-  static const muted = Color(0xFF8B97AB);
-  static const text = Color(0xFFF4F7FB);
-  static const accent = Color(0xFF2EE59D);
-  static const gold = Color(0xFFF5C542);
-  static const danger = Color(0xFFFF5C7A);
-  static const pending = Color(0xFF6EA8FF);
+/// One complete set of UI colors.
+class AppPalette {
+  const AppPalette({
+    required this.brightness,
+    required this.background,
+    required this.surface,
+    required this.surfaceHigh,
+    required this.border,
+    required this.muted,
+    required this.text,
+    required this.ink,
+    required this.onInk,
+    required this.accent,
+    required this.onAccent,
+    required this.gold,
+    required this.danger,
+    required this.pending,
+    required this.nav,
+    required this.navItem,
+    required this.navSelected,
+    required this.navSelectedFg,
+    required this.shadow,
+  });
+
+  final Brightness brightness;
+  final Color background;
+  final Color surface;
+  final Color surfaceHigh;
+  final Color border;
+  final Color muted;
+  final Color text;
+  final Color ink;
+  final Color onInk;
+  final Color accent;
+  final Color onAccent;
+  final Color gold;
+  final Color danger;
+  final Color pending;
+  final Color nav;
+  final Color navItem;
+  final Color navSelected;
+  final Color navSelectedFg;
+  final Color shadow;
+
+  /// Light mode palette.
+  static const light = AppPalette(
+    brightness: Brightness.light,
+    background: Color(0xFFE7E4DD),
+    surface: Color(0xFFFFFFFF),
+    surfaceHigh: Color(0xFFF1EFEB),
+    border: Color(0xFFE2DFD8),
+    muted: Color(0xFF9B988F),
+    text: Color(0xFF121212),
+    ink: Color(0xFF121212),
+    onInk: Color(0xFFFFFFFF),
+    accent: Color(0xFF0D6B3C),
+    onAccent: Color(0xFFFFFFFF),
+    gold: Color(0xFFD27A00),
+    danger: Color(0xFFD7261E),
+    pending: Color(0xFF2F6FD6),
+    nav: Color(0xFF121212),
+    navItem: Color(0xFF2B2B2B),
+    navSelected: Color(0xFFFFFFFF),
+    navSelectedFg: Color(0xFF121212),
+    shadow: Color(0x1F000000),
+  );
+
+  /// Dark mode palette.
+  static const dark = AppPalette(
+    brightness: Brightness.dark,
+    background: Color(0xFF0D0E10),
+    surface: Color(0xFF1A1C1F),
+    surfaceHigh: Color(0xFF26292D),
+    border: Color(0xFF2F3237),
+    muted: Color(0xFF8D9198),
+    text: Color(0xFFF2F1EE),
+    ink: Color(0xFFF2F1EE),
+    onInk: Color(0xFF121212),
+    accent: Color(0xFF3DD68C),
+    onAccent: Color(0xFF062414),
+    gold: Color(0xFFF5B342),
+    danger: Color(0xFFFF5B52),
+    pending: Color(0xFF6EA8FF),
+    nav: Color(0xFF26292D),
+    navItem: Color(0xFF34383D),
+    navSelected: Color(0xFFF2F1EE),
+    navSelectedFg: Color(0xFF121212),
+    shadow: Color(0x66000000),
+  );
 }
 
+/// Dynamic colors shared across the application.
+class AppColors {
+  static AppPalette _p = AppPalette.light;
+
+  static AppPalette get palette => _p;
+
+  static Brightness get brightness => _p.brightness;
+
+  static bool get isDark =>
+      _p.brightness == Brightness.dark;
+
+  /// Changes the active color palette.
+  static void use(Brightness brightness) {
+    _p = brightness == Brightness.dark
+        ? AppPalette.dark
+        : AppPalette.light;
+  }
+
+  static Color get background => _p.background;
+  static Color get surface => _p.surface;
+  static Color get surfaceHigh => _p.surfaceHigh;
+  static Color get border => _p.border;
+  static Color get muted => _p.muted;
+  static Color get text => _p.text;
+  static Color get ink => _p.ink;
+  static Color get onInk => _p.onInk;
+  static Color get accent => _p.accent;
+  static Color get onAccent => _p.onAccent;
+  static Color get gold => _p.gold;
+  static Color get danger => _p.danger;
+  static Color get pending => _p.pending;
+  static Color get nav => _p.nav;
+  static Color get navItem => _p.navItem;
+  static Color get navSelected => _p.navSelected;
+  static Color get navSelectedFg => _p.navSelectedFg;
+  static Color get shadow => _p.shadow;
+
+  static const orange = Color(0xFFF8A41C);
+  static const black = Color(0xFF121212);
+
+  static const heroStart = Color(0xFF0E7A42);
+  static const heroEnd = Color(0xFF3FA14A);
+}
+
+/// Application theme configuration.
 class AppTheme {
-  static ThemeData dark() {
-    const scheme = ColorScheme.dark(
-      primary: AppColors.accent,
-      onPrimary: Color(0xFF042016),
-      secondary: AppColors.gold,
+  static const double radius = 28;
+
+  /// Builds a theme using the active palette.
+  static ThemeData current() {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.accent,
+      brightness: AppColors.brightness,
+    ).copyWith(
+      primary: AppColors.ink,
+      onPrimary: AppColors.onInk,
+      secondary: AppColors.orange,
+      onSecondary: AppColors.black,
       surface: AppColors.surface,
       onSurface: AppColors.text,
+      surfaceContainerHighest: AppColors.surfaceHigh,
       error: AppColors.danger,
+      outline: AppColors.border,
+      outlineVariant: AppColors.border,
     );
+
+    const stadium = StadiumBorder();
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: AppColors.brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Roboto',
-      appBarTheme: const AppBarTheme(
+      splashFactory: InkSparkle.splashFactory,
+
+      textTheme: const TextTheme().apply(
+        bodyColor: AppColors.text,
+        displayColor: AppColors.text,
+      ),
+
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.text,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
       ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: AppColors.surfaceHigh,
-        contentTextStyle: const TextStyle(color: AppColors.text),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.ink,
+          foregroundColor: AppColors.onInk,
+          disabledBackgroundColor:
+              AppColors.ink.withValues(alpha: 0.18),
+          disabledForegroundColor:
+              AppColors.ink.withValues(alpha: 0.45),
+          minimumSize: const Size.fromHeight(56),
+          shape: stadium,
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.ink,
+          backgroundColor: AppColors.surface,
+          minimumSize: const Size.fromHeight(52),
+          shape: stadium,
+          side: BorderSide(color: AppColors.border),
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.ink,
+          textStyle: const TextStyle(
+            fontFamily: 'Roboto',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          shape: const WidgetStatePropertyAll(stadium),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: AppColors.border),
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? AppColors.ink
+                : AppColors.surfaceHigh,
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? AppColors.onInk
+                : AppColors.text,
+          ),
+          textStyle: const WidgetStatePropertyAll(
+            TextStyle(
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          minimumSize: const WidgetStatePropertyAll(
+            Size.fromHeight(46),
+          ),
+        ),
+      ),
+
+      chipTheme: ChipThemeData(
+        shape: stadium,
+        side: BorderSide(color: AppColors.border),
+        backgroundColor: AppColors.surface,
+        selectedColor: AppColors.ink,
+        showCheckmark: false,
+        secondarySelectedColor: AppColors.ink,
+        labelStyle: TextStyle(
+          fontFamily: 'Roboto',
+          fontWeight: FontWeight.w700,
+          color: AppColors.text,
+        ),
+        secondaryLabelStyle: TextStyle(
+          fontFamily: 'Roboto',
+          fontWeight: FontWeight.w700,
+          color: AppColors.onInk,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surfaceHigh,
+
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(
+            color: AppColors.ink,
+            width: 1.5,
+          ),
+        ),
+      ),
+
+      listTileTheme: ListTileThemeData(
+        iconColor: AppColors.muted,
+        textColor: AppColors.text,
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.ink,
+        contentTextStyle: TextStyle(
+          color: AppColors.onInk,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+
+      dividerTheme: DividerThemeData(
+        color: AppColors.border,
+        space: 1,
+      ),
+
       dividerColor: AppColors.border,
+
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: AppColors.ink,
+      ),
     );
   }
 
-static ThemeData light() {
-  const scheme = ColorScheme.light(
-    primary: Color(0xFF00875A),
-    onPrimary: Colors.white,
-    secondary: Color(0xFFB8860B),
-    surface: Color(0xFFFFFFFF),
-    onSurface: Color(0xFF172033),
-    error: Color(0xFFD32F2F),
-  );
+  /// Activate light mode.
+  static ThemeData light() {
+    AppColors.use(Brightness.light);
+    return current();
+  }
 
-  return ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
-    colorScheme: scheme,
-    scaffoldBackgroundColor: const Color(0xFFF4F7FB),
-    fontFamily: 'Roboto',
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFFF4F7FB),
-      foregroundColor: Color(0xFF172033),
-      elevation: 0,
-      centerTitle: false,
-    ),
-    snackBarTheme: SnackBarThemeData(
-      backgroundColor: Colors.white,
-      contentTextStyle: const TextStyle(
-        color: Color(0xFF172033),
-      ),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    ),
-    dividerColor: const Color(0xFFD7DFEA),
-  );
+  /// Activate dark mode.
+  static ThemeData dark() {
+    AppColors.use(Brightness.dark);
+    return current();
+  }
 }
 
-}

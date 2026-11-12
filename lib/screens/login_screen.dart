@@ -61,19 +61,40 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 40, 24, 32),
             children: [
-              const Icon(Icons.sports_football, color: AppColors.accent, size: 44),
-              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.ink,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.sports_football,
+                    color: AppColors.orange,
+                    size: 32,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               const Text(
                 'StatMyTeam',
-                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w900,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: -1,
+                ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Sign in to save favorites and sync your matchups.',
                 style: TextStyle(color: AppColors.muted, fontSize: 15),
               ),
               const SizedBox(height: 28),
               StatCard(
+                padding: const EdgeInsets.all(20),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -104,7 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           labelText: 'Password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
-                            tooltip: _obscure ? 'Show password' : 'Hide password',
+                            tooltip: _obscure
+                                ? 'Show password'
+                                : 'Hide password',
                             onPressed: () =>
                                 setState(() => _obscure = !_obscure),
                             icon: Icon(
@@ -125,14 +148,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 18),
                       FilledButton(
                         onPressed: _busy ? null : _submitEmail,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                        ),
                         child: _busy
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.onInk,
+                                ),
                               )
                             : const Text('Sign in'),
                       ),
@@ -141,13 +164,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 22),
-              const Row(
+              Row(
                 children: [
                   Expanded(child: Divider()),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('or continue with',
-                        style: TextStyle(color: AppColors.muted)),
+                    child: Text(
+                      'or continue with',
+                      style: TextStyle(color: AppColors.muted),
+                    ),
                   ),
                   Expanded(child: Divider()),
                 ],
@@ -166,9 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 10),
               TextButton(
-                onPressed: _busy
-                    ? null
-                    : () => _continue(method: 'guest'),
+                onPressed: _busy ? null : () => _continue(method: 'guest'),
                 child: const Text('Continue as guest'),
               ),
             ],
@@ -197,9 +220,8 @@ class _SsoButton extends StatelessWidget {
       icon: Icon(icon),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(50),
         alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
       ),
     );
   }

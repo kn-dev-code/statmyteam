@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
 import 'player_detail_screen.dart';
 import 'team_select_screen.dart';
@@ -26,28 +27,29 @@ class TeamDetailScreen extends StatelessWidget {
     final isFavorite = favorites.isFavorite(team.id);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(team.displayName),
+      appBar: PillAppBar(
+        title: team.displayName,
         actions: [
-          IconButton(
+          RoundIconButton(
             tooltip: isFavorite ? 'Remove favorite' : 'Add favorite',
-            icon: Icon(isFavorite ? Icons.star : Icons.star_border),
-            color: isFavorite ? AppColors.gold : null,
+            icon: isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
+            iconColor: isFavorite ? AppColors.orange : AppColors.ink,
             onPressed: () => favorites.toggle(team.id),
           ),
         ],
       ),
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             StatCard(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      TeamBadge(team: team, size: 60),
+                      TeamBadge(team: team, size: 72),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -56,8 +58,9 @@ class TeamDetailScreen extends StatelessWidget {
                             Text(
                               team.displayName,
                               style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.4,
                               ),
                             ),
                             Text(
@@ -67,7 +70,7 @@ class TeamDetailScreen extends StatelessWidget {
                                   '${team.conference} Conference',
                                 '${team.season} season',
                               ].join(' · '),
-                              style: const TextStyle(color: AppColors.muted),
+                              style: TextStyle(color: AppColors.muted),
                             ),
                           ],
                         ),
@@ -81,7 +84,7 @@ class TeamDetailScreen extends StatelessWidget {
                       (label: 'Record', value: team.record),
                       (
                         label: 'Win %',
-                        value: '${(team.winPercentage * 100).round()}%'
+                        value: '${(team.winPercentage * 100).round()}%',
                       ),
                       (
                         label: 'Pt diff / g',
@@ -90,29 +93,31 @@ class TeamDetailScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Last 5',
-                    style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  Text(
+                    'LAST 5',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   FormStrip(teamId: team.id, games: recent),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => TeamSelectScreen(
-                    mode: TeamSelectMode.matchup,
-                    preselected: team,
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => TeamSelectScreen(
+                          mode: TeamSelectMode.matchup,
+                          preselected: team,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.compare_arrows_rounded),
+                    label: const Text('Compare against another team'),
                   ),
-                ),
-              ),
-              icon: const Icon(Icons.compare_arrows),
-              label: const Text('Compare against another team'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
+                ],
               ),
             ),
             const SectionTitle('Season stats'),
@@ -157,25 +162,23 @@ class TeamDetailScreen extends StatelessWidget {
               subtitle: injuries.isEmpty
                   ? 'Everyone is available'
                   : '${injuries.length} player${injuries.length == 1 ? '' : 's'} '
-                      'listed',
+                        'listed',
             ),
             if (injuries.isNotEmpty)
               StatCard(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Column(
-                  children: [
-                    for (final p in injuries) _PlayerTile(player: p),
-                  ],
+                  children: [for (final p in injuries) _PlayerTile(player: p)],
                 ),
               ),
             const SectionTitle('Roster', subtitle: 'Tap a player for details'),
             for (final group in PositionGroup.values)
               if (roster.any((p) => group.positions.contains(p.position))) ...[
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 6),
+                  padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
                   child: Text(
                     group.label.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -184,7 +187,7 @@ class TeamDetailScreen extends StatelessWidget {
                   ),
                 ),
                 StatCard(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
                     children: [
                       for (final p in roster)
@@ -219,14 +222,18 @@ class _PlayerTile extends StatelessWidget {
           builder: (_) => PlayerDetailScreen(player: player),
         ),
       ),
-      leading: SizedBox(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      leading: Container(
         width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceHigh,
+          shape: BoxShape.circle,
+        ),
         child: Text(
-          '#${player.jerseyNumber}',
-          style: const TextStyle(
-            fontWeight: FontWeight.w900,
-            color: AppColors.muted,
-          ),
+          '${player.jerseyNumber}',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
       ),
       title: Text(
@@ -239,7 +246,7 @@ class _PlayerTile extends StatelessWidget {
           player.role?.label,
           if (player.injuryNote != null) player.injuryNote,
         ].whereType<String>().join(' · '),
-        style: const TextStyle(color: AppColors.muted, fontSize: 12),
+        style: TextStyle(color: AppColors.muted, fontSize: 12),
       ),
       trailing: PlayerStatusChip(status: player.status, compact: true),
     );

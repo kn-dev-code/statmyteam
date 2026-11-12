@@ -4,6 +4,7 @@ import '../logic/football_stats.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_chrome.dart';
 import '../widgets/stats_widgets.dart';
 
 class PlayerDetailScreen extends StatelessWidget {
@@ -18,10 +19,10 @@ class PlayerDetailScreen extends StatelessWidget {
     final color = teamColor(team);
 
     return Scaffold(
-      appBar: AppBar(title: Text(player.fullName)),
+      appBar: PillAppBar(title: player.fullName),
       body: ContentWidth(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             PlayerSummaryCard(player: player, team: team),
             const SectionTitle('Season stats'),
@@ -81,7 +82,10 @@ class PlayerSummaryCard extends StatelessWidget {
       if (player.weightLbs != null) ('Weight', '${player.weightLbs} lb'),
       if (player.classYear != null) ('Class', player.classYear!),
       if (player.yearsPro != null)
-        ('Experience', player.yearsPro == 1 ? 'Rookie' : '${player.yearsPro} yrs'),
+        (
+          'Experience',
+          player.yearsPro == 1 ? 'Rookie' : '${player.yearsPro} yrs',
+        ),
       if (player.college != null) ('College', player.college!),
     ];
 
@@ -92,30 +96,37 @@ class PlayerSummaryCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '#${player.jerseyNumber}',
-                style: TextStyle(
-                  color: color,
-                  fontSize: compact ? 22 : 30,
-                  fontWeight: FontWeight.w900,
+              Container(
+                width: compact ? 44 : 60,
+                height: compact ? 44 : 60,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Text(
+                  '${player.jerseyNumber}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: compact ? 17 : 22,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const Spacer(),
               PlayerStatusChip(status: player.status, compact: compact),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Text(
             player.fullName,
             style: TextStyle(
-              fontSize: compact ? 16 : 22,
-              fontWeight: FontWeight.w900,
+              fontSize: compact ? 16 : 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             FootballStats.positionNames[player.position] ?? player.position,
-            style: const TextStyle(color: AppColors.muted),
+            style: TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -142,10 +153,7 @@ class PlayerSummaryCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         label,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: AppColors.muted, fontSize: 13),
                       ),
                     ),
                     Flexible(
@@ -178,10 +186,10 @@ class _Tag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: ShapeDecoration(
+        color: color.withValues(alpha: 0.1),
+        shape: const StadiumBorder(),
       ),
       child: Text(
         text,
