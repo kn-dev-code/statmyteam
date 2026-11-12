@@ -3,6 +3,8 @@
 enum League {
   nfl('NFL', 'Pro'),
   ncaa('NCAA', 'College'),
+  nba('NBA', 'Pro'),
+  mls('MLS', 'Pro'),
   ufl('UFL', 'Spring pro'),
   cfl('CFL', 'Canadian pro'),
   highSchool('HS', 'High school');

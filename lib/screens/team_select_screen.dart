@@ -18,11 +18,15 @@ class TeamSelectScreen extends StatefulWidget {
     super.key,
     required this.mode,
     this.preselected,
+    this.sport,
     this.bottomInset = 24,
   });
 
   final TeamSelectMode mode;
   final Team? preselected;
+
+  /// When set (from the sport picker), only that sport's teams are listed.
+  final Sport? sport;
   final double bottomInset;
 
   @override
@@ -33,6 +37,7 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   Team? _a;
   Team? _b;
   League? _league;
+  Sport? _sport;
 
   bool get _isMatchup => widget.mode == TeamSelectMode.matchup;
 
@@ -42,6 +47,17 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
 
     _a = widget.preselected;
     _league = widget.preselected?.league;
+    _sport = widget.sport ?? widget.preselected?.sport;
+  }
+
+  void _selectSport(Sport sport) {
+    if (_sport == sport) return;
+    setState(() {
+      _sport = sport;
+      _league = null;
+      _a = null;
+      _b = null;
+    });
   }
 
   void _selectLeague(League league) {
@@ -100,7 +116,11 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = StatsScope.of(context);
-    final leagues = repo.leagues;
+    final sports = repo.sports;
+    final sport = _sport != null && sports.contains(_sport)
+        ? _sport!
+        : (sports.isEmpty ? null : sports.first);
+    final leagues = repo.leaguesFor(sport);
 
     if (leagues.isEmpty) {
       return Scaffold(
@@ -138,11 +158,15 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
         ? _league!
         : leagues.first;
 
-    final conferences = repo.teamsByConference(league);
+    final conferences = repo.teamsByConference(league, sport: sport);
 
     return Scaffold(
       appBar: PillAppBar(
-        title: _isMatchup ? 'Head-to-Head' : 'Team Stats',
+        title: sport == null
+            ? (_isMatchup ? 'Head-to-Head' : 'Team Stats')
+            : (_isMatchup
+                ? '${sport.label} matchup'
+                : '${sport.label} teams'),
         actions: [
           RoundIconButton(
             tooltip: 'Search teams and players',
@@ -207,10 +231,19 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (widget.sport == null && sports.length > 1) ...[
+                _SportPills(
+                  sports: sports,
+                  selected: sport!,
+                  onSelect: _selectSport,
+                ),
+                const SizedBox(height: 14),
+              ],
               if (leagues.length > 1) ...[
                 _LeaguePills(
                   leagues: leagues,
                   selected: league,
+                  sport: sport,
                   onSelect: _selectLeague,
                 ),
                 const SizedBox(height: 14),
@@ -364,6 +397,7 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                                   ? 'B'
                                   : null,
                           showChevron: !_isMatchup,
+                          scoringLabel: team.sport.scoringLabel,
                           onTap: () => _onTeamTap(team),
                         ),
                     ],
@@ -379,16 +413,50 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
 }
 
 /// NFL and NCAA league selection.
+class _SportPills extends StatelessWidget {
+  const _SportPills({
+    required this.sports,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<Sport> sports;
+  final Sport selected;
+  final ValueChanged<Sport> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (final sport in sports) ...[
+            if (sport != sports.first) const SizedBox(width: 8),
+            ChoiceChip(
+              key: ValueKey('sport_${sport.name}'),
+              label: Text(sport.label),
+              selected: sport == selected,
+              onSelected: (_) => onSelect(sport),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _LeaguePills extends StatelessWidget {
   const _LeaguePills({
     required this.leagues,
     required this.selected,
     required this.onSelect,
+    this.sport,
   });
 
   final List<League> leagues;
   final League selected;
   final ValueChanged<League> onSelect;
+  final Sport? sport;
 
   @override
   Widget build(BuildContext context) {
@@ -436,7 +504,14 @@ class _LeaguePills extends StatelessWidget {
                             child: Icon(
                               league.isAmateur
                                   ? Icons.school_outlined
-                                  : Icons.sports_football,
+                                  : switch (sport ?? Sport.football) {
+                                      Sport.basketball =>
+                                        Icons.sports_basketball,
+                                      Sport.soccer => Icons.sports_soccer,
+                                      Sport.baseball => Icons.sports_baseball,
+                                      Sport.hockey => Icons.sports_hockey,
+                                      Sport.football => Icons.sports_football,
+                                    },
                               size: 20,
                               color: AppColors.ink,
                             ),
@@ -574,12 +649,14 @@ class _TeamRow extends StatelessWidget {
     required this.onTap,
     this.selectedAs,
     this.showChevron = false,
+    this.scoringLabel = 'PPG',
   });
 
   final Team team;
   final VoidCallback onTap;
   final String? selectedAs;
   final bool showChevron;
+  final String scoringLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -610,8 +687,9 @@ class _TeamRow extends StatelessWidget {
 
       subtitle: Text(
         '${team.record} · '
-        '${team.stat('ppg').toStringAsFixed(1)} PPG · '
-        '${team.stat('papg').toStringAsFixed(1)} allowed',
+        '${team.stat('ppg').toStringAsFixed(team.sport == Sport.soccer ? 2 : 1)} '
+        '$scoringLabel · '
+        '${team.stat('papg').toStringAsFixed(team.sport == Sport.soccer ? 2 : 1)} allowed',
         style: TextStyle(
           color: AppColors.muted,
           fontSize: 12,

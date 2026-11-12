@@ -67,8 +67,8 @@ void main() {
     expect(h2h.favors, aus);
   });
 
-  test('every team has a starter in every position group', () {
-    for (final team in repo.teams) {
+  test('every football team has a starter in every position group', () {
+    for (final team in repo.teams.where((t) => t.sport == Sport.football)) {
       for (final group in PositionGroup.values) {
         expect(
           repo.rosterInGroup(team.id, group).any((p) => p.isStarter),
@@ -79,14 +79,14 @@ void main() {
     }
   });
 
-  test('every team belongs to a league, and both leagues have data', () {
-    expect(repo.leagues, [League.nfl, League.ncaa]);
-    for (final team in repo.teams) {
+  test('every team belongs to a league, and both football leagues have data', () {
+    expect(repo.leagues, containsAll([League.nfl, League.ncaa, League.nba, League.mls]));
+    for (final team in repo.teams.where((t) => t.sport == Sport.football)) {
       expect(team.league, isNotNull, reason: team.abbreviation);
       expect(repo.rosterFor(team.id), hasLength(11),
           reason: '${team.abbreviation} roster');
     }
-    expect(repo.teamsByConference(League.ncaa).keys,
+    expect(repo.teamsByConference(League.ncaa, sport: Sport.football).keys,
         containsAll(['Pacific Ridge', 'Great Plains']));
     expect(Team.fromJson(repo.teamById('ptu').toJson()).league, League.ncaa);
   });

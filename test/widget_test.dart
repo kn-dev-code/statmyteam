@@ -48,9 +48,17 @@ Future<void> _tapText(
   await tester.pumpAndSettle();
 }
 
-// Select football before opening the team selection screen.
+// Select a sport before opening the team selection screen.
 Future<void> _selectFootball(WidgetTester tester) async {
   await _tapText(tester, 'American Football');
+}
+
+Future<void> _selectBasketball(WidgetTester tester) async {
+  await _tapText(tester, 'Basketball');
+}
+
+Future<void> _selectSoccer(WidgetTester tester) async {
+  await _tapText(tester, 'Soccer');
 }
 
 void main() {
@@ -182,6 +190,7 @@ void main() {
 
       expect(find.text('Season stats'), findsOneWidget);
       expect(find.text('Injury report'), findsOneWidget);
+      expect(find.text('Strengths & weaknesses'), findsOneWidget);
       expect(find.text('IR'), findsWidgets);
 
       await tester.tap(
@@ -452,6 +461,52 @@ void main() {
       );
 
       expect(AppColors.isDark, isFalse);
+    },
+  );
+
+  testWidgets(
+    'basketball team select hides football clubs',
+    (tester) async {
+      _tallView(tester);
+      await tester.pumpWidget(await _app());
+
+      await _tapText(tester, 'Team Stats');
+      expect(find.text('American Football'), findsOneWidget);
+      expect(find.text('Basketball'), findsOneWidget);
+      expect(find.text('Soccer'), findsOneWidget);
+
+      await _selectBasketball(tester);
+
+      expect(find.text('Seattle Rainiers'), findsOneWidget);
+      expect(find.text('Portland Lumberjacks'), findsNothing);
+      expect(find.text('Prairie Tech Bison'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'soccer head-to-head stays in MLS and opens a matchup',
+    (tester) async {
+      _tallView(tester);
+      await tester.pumpWidget(await _app());
+
+      await _tapText(tester, 'Head-to-Head');
+      await _selectSoccer(tester);
+
+      expect(find.text('Portland Cascades'), findsOneWidget);
+      expect(find.text('Portland Lumberjacks'), findsNothing);
+
+      await _tapText(tester, 'Portland Cascades');
+      await _tapText(tester, 'New York Harbor');
+
+      final compare = find.widgetWithText(FilledButton, 'Compare teams');
+      expect(tester.widget<FilledButton>(compare).onPressed, isNotNull);
+
+      await tester.tap(compare);
+      await tester.pumpAndSettle();
+
+      expect(find.text('PDX vs NYC'), findsOneWidget);
+      expect(find.text('Goals / game'), findsOneWidget);
+      expect(find.textContaining('outlook'), findsWidgets);
     },
   );
 }

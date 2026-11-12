@@ -363,8 +363,8 @@ class _HomeTab extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               repo.isLive
-                  ? 'NFL teams and rosters load from ESPN. NCAA sample data '
-                        'remains available for college browsing.'
+                  ? 'NFL teams and rosters load from ESPN. NCAA, NBA, and MLS '
+                        'sample data remains available for browsing.'
                   : 'Sample league data: teams and players are fictional '
                         'while testing.',
               textAlign: TextAlign.center,

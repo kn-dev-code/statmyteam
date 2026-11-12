@@ -1,7 +1,9 @@
 import '../logic/football_stats.dart';
 import '../models/models.dart';
+import 'basketball_data.dart';
 import 'espn_football_api.dart';
 import 'football_data.dart';
+import 'soccer_data.dart';
 
 /// Read-only access to teams, players, and results for the stats screens.
 ///
@@ -21,11 +23,26 @@ class StatsRepository {
             ..sort((a, b) => b.startTime.compareTo(a.startTime)),
         );
 
-  /// Fictional NFL and NCAA sample leagues.
+  /// Fictional NFL, NCAA, NBA, and MLS sample leagues.
   factory StatsRepository.sampleFootball() => StatsRepository(
-        teams: [...footballTeams, ...collegeTeams],
-        players: [...footballPlayers, ...collegePlayers],
-        games: [...footballGames, ...collegeGames],
+        teams: [
+          ...footballTeams,
+          ...collegeTeams,
+          ...basketballTeams,
+          ...soccerTeams,
+        ],
+        players: [
+          ...footballPlayers,
+          ...collegePlayers,
+          ...basketballPlayers,
+          ...soccerPlayers,
+        ],
+        games: [
+          ...footballGames,
+          ...collegeGames,
+          ...basketballGames,
+          ...soccerGames,
+        ],
       );
 
   /// Live NFL from ESPN, plus the sample NCAA set so college browsing still works.
@@ -36,16 +53,36 @@ class StatsRepository {
     try {
       final live = await client.fetchLeague();
       return StatsRepository(
-        teams: [...live.teams, ...collegeTeams],
-        players: [...live.players, ...collegePlayers],
-        games: [...live.games, ...collegeGames],
+        teams: [...live.teams, ...collegeTeams, ...basketballTeams, ...soccerTeams],
+        players: [
+          ...live.players,
+          ...collegePlayers,
+          ...basketballPlayers,
+          ...soccerPlayers,
+        ],
+        games: [...live.games, ...collegeGames, ...basketballGames, ...soccerGames],
         isLive: true,
       );
     } catch (error) {
       return StatsRepository(
-        teams: [...footballTeams, ...collegeTeams],
-        players: [...footballPlayers, ...collegePlayers],
-        games: [...footballGames, ...collegeGames],
+        teams: [
+          ...footballTeams,
+          ...collegeTeams,
+          ...basketballTeams,
+          ...soccerTeams,
+        ],
+        players: [
+          ...footballPlayers,
+          ...collegePlayers,
+          ...basketballPlayers,
+          ...soccerPlayers,
+        ],
+        games: [
+          ...footballGames,
+          ...collegeGames,
+          ...basketballGames,
+          ...soccerGames,
+        ],
         isLive: false,
         loadError: '$error',
       );
@@ -68,16 +105,36 @@ class StatsRepository {
 
   Team teamById(String id) => teams.firstWhere((team) => team.id == id);
 
+  /// Sports that have at least one team, in [Sport] order.
+  List<Sport> get sports => [
+        for (final sport in Sport.values)
+          if (teams.any((t) => t.sport == sport)) sport,
+      ];
+
   /// Leagues that have at least one team, in [League] order.
-  List<League> get leagues => [
+  List<League> get leagues => leaguesFor();
+
+  /// Leagues that have at least one team, optionally limited to [sport].
+  List<League> leaguesFor([Sport? sport]) => [
         for (final league in League.values)
-          if (teams.any((t) => t.league == league)) league,
+          if (teams.any(
+            (t) => t.league == league && (sport == null || t.sport == sport),
+          ))
+            league,
+      ];
+
+  /// Same-league clubs used to grade strengths and weaknesses.
+  List<Team> peersOf(Team team) => [
+        for (final peer in teams)
+          if (peer.sport == team.sport && peer.league == team.league) peer,
       ];
 
   /// Conference name → teams in [league], best record first.
-  Map<String, List<Team>> teamsByConference(League league) {
+  Map<String, List<Team>> teamsByConference(League league, {Sport? sport}) {
     final map = <String, List<Team>>{};
-    for (final team in teams.where((t) => t.league == league)) {
+    for (final team in teams.where(
+      (t) => t.league == league && (sport == null || t.sport == sport),
+    )) {
       map.putIfAbsent(team.conference ?? 'Independent', () => []).add(team);
     }
     for (final list in map.values) {
