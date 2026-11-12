@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -37,6 +38,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     final favorites = FavoritesStore.open();
     final settings = SettingsStore.open();
     final repo = StatsRepository.liveFootball();
+
     return (
       repo: await repo,
       favorites: await favorites,
@@ -50,13 +52,13 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       future: _boot,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          // Saved preference is not loaded yet; follow the system.
           AppColors.use(
             WidgetsBinding.instance.platformDispatcher.platformBrightness,
           );
+
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.current(),
+            theme: AppTheme.dark(),
             home: const Scaffold(
               body: Center(
                 child: Column(
@@ -73,6 +75,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         }
 
         final data = snapshot.data!;
+
         return StatMyTeamApp(
           repository: data.repo,
           favorites: data.favorites,
@@ -100,51 +103,81 @@ class StatMyTeamApp extends StatefulWidget {
   final bool showLogin;
 
   @override
-  State<StatMyTeamApp> createState() => _StatMyTeamAppState();
+  State<StatMyTeamApp> createState() =>
+      _StatMyTeamAppState();
 }
 
-/// Resolves light/dark from the saved mode and the system setting, swaps
-/// the [AppColors] palette, and rebuilds the tree in place so open routes
-/// keep their state.
+/// Applies saved light/dark/system preferences
+/// and reacts to OS theme changes.
 class _StatMyTeamAppState extends State<StatMyTeamApp>
     with WidgetsBindingObserver {
+
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
+
     widget.settings.addListener(_applyBrightness);
+
     AppColors.use(_resolveBrightness());
+  }
+
+  @override
+  void didUpdateWidget(covariant StatMyTeamApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.settings != widget.settings) {
+      oldWidget.settings.removeListener(_applyBrightness);
+
+      widget.settings.addListener(_applyBrightness);
+
+      AppColors.use(_resolveBrightness());
+    }
   }
 
   @override
   void dispose() {
     widget.settings.removeListener(_applyBrightness);
+
     WidgetsBinding.instance.removeObserver(this);
+
     super.dispose();
   }
 
   @override
-  void didChangePlatformBrightness() => _applyBrightness();
+  void didChangePlatformBrightness() {
+    _applyBrightness();
+  }
 
-  Brightness _resolveBrightness() => switch (widget.settings.themeMode) {
-    ThemeMode.light => Brightness.light,
-    ThemeMode.dark => Brightness.dark,
-    ThemeMode.system =>
-      WidgetsBinding.instance.platformDispatcher.platformBrightness,
-  };
+  Brightness _resolveBrightness() =>
+      switch (widget.settings.themeMode) {
+        ThemeMode.light => Brightness.light,
+        ThemeMode.dark => Brightness.dark,
+        ThemeMode.system =>
+          WidgetsBinding
+              .instance
+              .platformDispatcher
+              .platformBrightness,
+      };
 
   void _applyBrightness() {
+    if (!mounted) return;
+
     final next = _resolveBrightness();
+
     if (next == AppColors.brightness) return;
+
     AppColors.use(next);
-    // Many widgets read AppColors directly rather than through Theme, so
-    // mark every element dirty; state (including the route stack) is kept.
+
+    // Rebuild widgets using AppColors directly.
     void rebuild(Element element) {
       element.markNeedsBuild();
       element.visitChildren(rebuild);
     }
 
     (context as Element).visitChildren(rebuild);
+
     setState(() {});
   }
 
@@ -159,9 +192,32 @@ class _StatMyTeamAppState extends State<StatMyTeamApp>
           child: MaterialApp(
             title: 'StatMyTeam',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.current(),
-            // Palette-driven widgets switch instantly; match that.
-            themeAnimationDuration: Duration.zero,
+
+            theme: AppTheme.current().copyWith(
+              
+inputDecorationTheme: InputDecorationTheme(
+  filled: true,
+  fillColor: AppColors.surfaceHigh,
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(
+      color: AppColors.border,
+    ),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(
+      color: AppColors.border,
+    ),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(
+      color: AppColors.accent,
+    ),
+  ),
+),
+            ),
             home: widget.showLogin
                 ? const LoginScreen()
                 : const MainMenuScreen(),

@@ -1,7 +1,7 @@
+
 import 'package:flutter/material.dart';
 
-/// One complete set of UI colors. [AppColors] reads from whichever
-/// palette is active, so every screen switches with the app's theme mode.
+/// One complete set of UI colors.
 class AppPalette {
   const AppPalette({
     required this.brightness,
@@ -45,7 +45,7 @@ class AppPalette {
   final Color navSelectedFg;
   final Color shadow;
 
-  /// Warm grey canvas, white cards, black pill actions.
+  /// Light mode palette.
   static const light = AppPalette(
     brightness: Brightness.light,
     background: Color(0xFFE7E4DD),
@@ -68,8 +68,7 @@ class AppPalette {
     shadow: Color(0x1F000000),
   );
 
-  /// Near-black canvas, charcoal cards, light pill actions. Greens and
-  /// reds are brightened so values stay legible on dark surfaces.
+  /// Dark mode palette.
   static const dark = AppPalette(
     brightness: Brightness.dark,
     background: Color(0xFF0D0E10),
@@ -93,87 +92,71 @@ class AppPalette {
   );
 }
 
-/// Card-first palette: canvas, cards, pill actions, an orange action
-/// accent, and green for "better" values. Values come from the active
-/// [AppPalette]; see [AppColors.use].
+/// Dynamic colors shared across the application.
 class AppColors {
   static AppPalette _p = AppPalette.light;
 
   static AppPalette get palette => _p;
+
   static Brightness get brightness => _p.brightness;
-  static bool get isDark => _p.brightness == Brightness.dark;
 
-  /// Switches the active palette. Callers must rebuild the tree afterwards.
-  static void use(Brightness brightness) =>
-      _p = brightness == Brightness.dark ? AppPalette.dark : AppPalette.light;
+  static bool get isDark =>
+      _p.brightness == Brightness.dark;
 
-  /// Canvas behind every card.
+  /// Changes the active color palette.
+  static void use(Brightness brightness) {
+    _p = brightness == Brightness.dark
+        ? AppPalette.dark
+        : AppPalette.light;
+  }
+
   static Color get background => _p.background;
-
-  /// Cards and header pills.
   static Color get surface => _p.surface;
-
-  /// Soft pills inside cards (metric chips, labels).
   static Color get surfaceHigh => _p.surfaceHigh;
-
   static Color get border => _p.border;
   static Color get muted => _p.muted;
   static Color get text => _p.text;
-
-  /// Primary pill buttons and selected chips (black in light, off-white
-  /// in dark), with [onInk] for their content.
   static Color get ink => _p.ink;
   static Color get onInk => _p.onInk;
-
-  /// "Better" / positive values and wins, with [onAccent] for content.
   static Color get accent => _p.accent;
   static Color get onAccent => _p.onAccent;
-
   static Color get gold => _p.gold;
   static Color get danger => _p.danger;
   static Color get pending => _p.pending;
-
-  /// Floating nav bar.
   static Color get nav => _p.nav;
   static Color get navItem => _p.navItem;
   static Color get navSelected => _p.navSelected;
   static Color get navSelectedFg => _p.navSelectedFg;
-
   static Color get shadow => _p.shadow;
 
-  /// Bright action color for the round "+" button and hero pills. Same in
-  /// both modes.
   static const orange = Color(0xFFF8A41C);
-
-  /// Fixed near-black for text on [orange] and on white hero pills.
   static const black = Color(0xFF121212);
 
-  /// Hero banner gradient (same in both modes).
   static const heroStart = Color(0xFF0E7A42);
   static const heroEnd = Color(0xFF3FA14A);
 }
 
+/// Application theme configuration.
 class AppTheme {
   static const double radius = 28;
 
-  /// Theme for the active [AppColors] palette.
+  /// Builds a theme using the active palette.
   static ThemeData current() {
-    final scheme =
-        ColorScheme.fromSeed(
-          seedColor: AppColors.accent,
-          brightness: AppColors.brightness,
-        ).copyWith(
-          primary: AppColors.ink,
-          onPrimary: AppColors.onInk,
-          secondary: AppColors.orange,
-          onSecondary: AppColors.black,
-          surface: AppColors.surface,
-          onSurface: AppColors.text,
-          surfaceContainerHighest: AppColors.surfaceHigh,
-          error: AppColors.danger,
-          outline: AppColors.border,
-          outlineVariant: AppColors.border,
-        );
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.accent,
+      brightness: AppColors.brightness,
+    ).copyWith(
+      primary: AppColors.ink,
+      onPrimary: AppColors.onInk,
+      secondary: AppColors.orange,
+      onSecondary: AppColors.black,
+      surface: AppColors.surface,
+      onSurface: AppColors.text,
+      surfaceContainerHighest: AppColors.surfaceHigh,
+      error: AppColors.danger,
+      outline: AppColors.border,
+      outlineVariant: AppColors.border,
+    );
 
     const stadium = StadiumBorder();
 
@@ -184,10 +167,12 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Roboto',
       splashFactory: InkSparkle.splashFactory,
+
       textTheme: const TextTheme().apply(
         bodyColor: AppColors.text,
         displayColor: AppColors.text,
       ),
+
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.text,
@@ -195,12 +180,15 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
       ),
+
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.ink,
           foregroundColor: AppColors.onInk,
-          disabledBackgroundColor: AppColors.ink.withValues(alpha: 0.18),
-          disabledForegroundColor: AppColors.ink.withValues(alpha: 0.45),
+          disabledBackgroundColor:
+              AppColors.ink.withValues(alpha: 0.18),
+          disabledForegroundColor:
+              AppColors.ink.withValues(alpha: 0.45),
           minimumSize: const Size.fromHeight(56),
           shape: stadium,
           textStyle: const TextStyle(
@@ -210,6 +198,7 @@ class AppTheme {
           ),
         ),
       ),
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.ink,
@@ -224,6 +213,7 @@ class AppTheme {
           ),
         ),
       ),
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.ink,
@@ -233,10 +223,13 @@ class AppTheme {
           ),
         ),
       ),
+
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
           shape: const WidgetStatePropertyAll(stadium),
-          side: WidgetStatePropertyAll(BorderSide(color: AppColors.border)),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: AppColors.border),
+          ),
           backgroundColor: WidgetStateProperty.resolveWith(
             (states) => states.contains(WidgetState.selected)
                 ? AppColors.ink
@@ -248,11 +241,17 @@ class AppTheme {
                 : AppColors.text,
           ),
           textStyle: const WidgetStatePropertyAll(
-            TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w700),
+            TextStyle(
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          minimumSize: const WidgetStatePropertyAll(Size.fromHeight(46)),
+          minimumSize: const WidgetStatePropertyAll(
+            Size.fromHeight(46),
+          ),
         ),
       ),
+
       chipTheme: ChipThemeData(
         shape: stadium,
         side: BorderSide(color: AppColors.border),
@@ -260,8 +259,6 @@ class AppTheme {
         selectedColor: AppColors.ink,
         showCheckmark: false,
         secondarySelectedColor: AppColors.ink,
-        // ChoiceChip uses labelStyle when unselected, secondaryLabelStyle
-        // when selected.
         labelStyle: TextStyle(
           fontFamily: 'Roboto',
           fontWeight: FontWeight.w700,
@@ -272,47 +269,74 @@ class AppTheme {
           fontWeight: FontWeight.w700,
           color: AppColors.onInk,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 8,
+        ),
       ),
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceHigh,
+
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: AppColors.ink, width: 1.5),
+          borderSide: BorderSide(
+            color: AppColors.ink,
+            width: 1.5,
+          ),
         ),
       ),
+
       listTileTheme: ListTileThemeData(
         iconColor: AppColors.muted,
         textColor: AppColors.text,
       ),
+
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.ink,
-        contentTextStyle: TextStyle(color: AppColors.onInk),
+        contentTextStyle: TextStyle(
+          color: AppColors.onInk,
+        ),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
       ),
-      dividerTheme: DividerThemeData(color: AppColors.border, space: 1),
+
+      dividerTheme: DividerThemeData(
+        color: AppColors.border,
+        space: 1,
+      ),
+
       dividerColor: AppColors.border,
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: AppColors.ink),
+
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: AppColors.ink,
+      ),
     );
   }
 
+  /// Activate light mode.
   static ThemeData light() {
     AppColors.use(Brightness.light);
     return current();
   }
 
+  /// Activate dark mode.
   static ThemeData dark() {
     AppColors.use(Brightness.dark);
     return current();
   }
 }
+

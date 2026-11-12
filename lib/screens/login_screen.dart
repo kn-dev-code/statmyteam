@@ -9,7 +9,12 @@ import 'main_menu_screen.dart';
 /// Auth providers are stubbed for now: a successful form submit or SSO tap
 /// continues into the app so the UI flow can be exercised end-to-end.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+  super.key,
+  this.onToggleTheme,
+});
+
+final VoidCallback? onToggleTheme;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -35,8 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const MainMenuScreen()),
-    );
+  MaterialPageRoute<void>(
+    builder: (_) => MainMenuScreen(
+      onToggleTheme: widget.onToggleTheme,
+    ),
+  ),
+);
   }
 
   Future<void> _submitEmail() async {

@@ -12,10 +12,13 @@ import 'settings_tab.dart';
 import 'team_detail_screen.dart';
 import 'team_select_screen.dart';
 import 'upcoming_games_screen.dart';
+import 'sports_selection_screen.dart';
 
 /// App home: a floating pill nav over three tabs (Home, Teams, Saved).
 class MainMenuScreen extends StatefulWidget {
-  const MainMenuScreen({super.key});
+  const MainMenuScreen({super.key, this.onToggleTheme});
+
+  final VoidCallback? onToggleTheme;
 
   @override
   State<MainMenuScreen> createState() => _MainMenuScreenState();
@@ -38,7 +41,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Only the visible tab is built so text finders and semantics see one
     // copy of shared sections like "Favorite teams".
     final body = switch (_tab) {
-      0 => _HomeTab(onViewSaved: () => _select(2)),
+      0 => _HomeTab(
+        onViewSaved: () => _select(2),
+        onOpenSettings: () => _select(3),
+        onToggleTheme: widget.onToggleTheme,
+      ),
       1 => const TeamSelectScreen(
         mode: TeamSelectMode.single,
         bottomInset: FloatingNavBar.clearance,
@@ -140,9 +147,15 @@ class _Wordmark extends StatelessWidget {
 }
 
 class _HomeTab extends StatelessWidget {
-  const _HomeTab({required this.onViewSaved});
+  const _HomeTab({
+    required this.onViewSaved,
+    required this.onOpenSettings,
+    this.onToggleTheme,
+  });
 
   final VoidCallback onViewSaved;
+  final VoidCallback onOpenSettings;
+  final VoidCallback? onToggleTheme;
 
   @override
   Widget build(BuildContext context) {
@@ -187,12 +200,19 @@ class _HomeTab extends StatelessWidget {
               tooltip: 'New head-to-head',
               onPressed: () => _open(
                 context,
-                const TeamSelectScreen(mode: TeamSelectMode.matchup),
+                const SportsSelectionScreen(mode: TeamSelectMode.matchup),
               ),
             ),
           ],
         ),
         actions: [
+          RoundIconButton(
+            icon: Icons.brightness_6_outlined,
+            tooltip: onToggleTheme == null
+                ? 'Open theme settings'
+                : 'Toggle light/dark mode',
+            onPressed: onToggleTheme ?? onOpenSettings,
+          ),
           RoundIconButton(
             icon: Icons.search_rounded,
             tooltip: 'Search teams and players',
@@ -256,7 +276,7 @@ class _HomeTab extends StatelessWidget {
                       dark: true,
                       onTap: () => _open(
                         context,
-                        const TeamSelectScreen(mode: TeamSelectMode.matchup),
+                        const SportsSelectionScreen(mode: TeamSelectMode.matchup),
                       ),
                     ),
                   ),
@@ -268,7 +288,7 @@ class _HomeTab extends StatelessWidget {
                       subtitle: 'Season numbers, form, roster, and injuries',
                       onTap: () => _open(
                         context,
-                        const TeamSelectScreen(mode: TeamSelectMode.single),
+                        const SportsSelectionScreen(mode: TeamSelectMode.single),
                       ),
                     ),
                   ),
