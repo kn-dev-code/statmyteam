@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import '../logic/football_stats.dart';
 import '../models/models.dart';
 import 'basketball_data.dart';
@@ -47,7 +49,8 @@ class StatsRepository {
 
   /// Live NFL from ESPN, plus the sample NCAA set so college browsing still works.
   ///
-  /// Falls back to [sampleFootball] if the network request fails.
+  /// Teams that fail to load are skipped; falls back to [sampleFootball] only
+  /// when no live NFL team could be loaded.
   static Future<StatsRepository> liveFootball({EspnFootballApi? api}) async {
     final client = api ?? EspnFootballApi();
     try {
@@ -63,7 +66,13 @@ class StatsRepository {
         games: [...live.games, ...collegeGames, ...basketballGames, ...soccerGames],
         isLive: true,
       );
-    } catch (error) {
+    } catch (error, stack) {
+      developer.log(
+        'Live NFL load failed; falling back to sample data',
+        name: 'StatsRepository',
+        error: error,
+        stackTrace: stack,
+      );
       return StatsRepository(
         teams: [
           ...footballTeams,

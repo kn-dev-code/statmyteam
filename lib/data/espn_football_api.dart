@@ -20,15 +20,21 @@ class EspnFootballApi {
   final Duration timeout;
 
   /// Fetches NFL teams, rosters, recent completed games, and season averages.
+  ///
+  /// Individual team failures are logged and skipped so one bad request does
+  /// not discard the rest of the league. Throws only when the team list itself
+  /// cannot be loaded or no team loads successfully.
   Future<({List<Team> teams, List<Player> players, List<GameStats> games})>
       fetchLeague() async {
-    final scoreboard = await _getJson('$_siteBase/scoreboard');
+    final scoreboard = await _soft(_getJson('$_siteBase/scoreboard'));
     final year =
-        (scoreboard['season'] as Map<String, dynamic>?)?['year'];
+        (scoreboard?['season'] as Map<String, dynamic>?)?['year'];
     final seasonYear = year is num ? year.toInt() : DateTime.now().year;
     final season = '$seasonYear';
 
-    final conferenceByTeam = await _conferencesByTeamId();
+    final conferenceByTeam =
+        await _softValue(_conferencesByTeamId(), 'standings') ??
+            const <String, String>{};
     final teamSummaries = await _fetchTeamSummaries();
 
     final teams = <Team>[];
@@ -41,14 +47,18 @@ class EspnFootballApi {
       final batch = teamSummaries.skip(i).take(batchSize).toList();
       final results = await Future.wait([
         for (final summary in batch)
-          _loadTeamBundle(
-            summary: summary,
-            season: season,
-            seasonYear: seasonYear,
-            conference: conferenceByTeam[summary.id] ?? 'NFL',
+          _softValue(
+            _loadTeamBundle(
+              summary: summary,
+              season: season,
+              seasonYear: seasonYear,
+              conference: conferenceByTeam[summary.id] ?? 'NFL',
+            ),
+            'team ${summary.id}',
           ),
       ]);
       for (final result in results) {
+        if (result == null) continue;
         teams.add(result.team);
         players.addAll(result.players);
         for (final game in result.games) {
@@ -57,10 +67,23 @@ class EspnFootballApi {
       }
     }
 
+    if (teams.isEmpty) {
+      throw StateError('No NFL teams could be loaded from ESPN.');
+    }
+    final skipped = teamSummaries.length - teams.length;
+    if (skipped > 0) {
+      developer.log(
+        'Skipped $skipped of ${teamSummaries.length} NFL teams after failed requests',
+        name: 'EspnFootballApi',
+      );
+    }
+
     // Team schedule feeds can omit future events. The scoreboard is the
     // canonical current-week slate, so merge it in to power Upcoming Games.
-    for (final game in _parseSchedule(scoreboard, season: season)) {
-      gamesById.putIfAbsent(game.id, () => game);
+    if (scoreboard != null) {
+      for (final game in _parseSchedule(scoreboard, season: season)) {
+        gamesById.putIfAbsent(game.id, () => game);
+      }
     }
 
     return (
@@ -415,6 +438,21 @@ class EspnFootballApi {
     if (standingSummary == null) return null;
     final match = RegExp(r'in\s+(.+)$').firstMatch(standingSummary);
     return match?.group(1)?.trim();
+  }
+
+  /// Like [_soft], but for any result type; [what] labels the log entry.
+  Future<T?> _softValue<T>(Future<T> future, String what) async {
+    try {
+      return await future;
+    } catch (error, stack) {
+      developer.log(
+        'ESPN load failed for $what; skipping',
+        name: 'EspnFootballApi',
+        error: error,
+        stackTrace: stack,
+      );
+      return null;
+    }
   }
 
   Future<Map<String, dynamic>?> _soft(Future<Map<String, dynamic>> future) async {
