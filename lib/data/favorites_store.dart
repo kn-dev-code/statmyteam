@@ -1,13 +1,13 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persists favorite team ids locally.
+/// Persists favorite teams, favorite matchups, and hidden teams locally.
 class FavoritesStore extends ChangeNotifier {
   FavoritesStore(this._prefs);
 
   static const _key = 'favorite_team_ids';
   static const _matchupKey = 'favorite_matchup_ids';
+  static const _hiddenKey = 'hidden_team_ids';
 
   final SharedPreferences _prefs;
 
@@ -17,8 +17,41 @@ class FavoritesStore extends ChangeNotifier {
   late final Set<String> _matchups =
       _prefs.getStringList(_matchupKey)?.toSet() ?? <String>{};
 
+  late Set<String> _hiddenIds =
+      _prefs.getStringList(_hiddenKey)?.toSet() ?? <String>{};
+
   Set<String> get ids => Set.unmodifiable(_ids);
+
   Set<String> get matchupIds => Set.unmodifiable(_matchups);
+
+  Set<String> get hiddenIds => Set.unmodifiable(_hiddenIds);
+
+  bool isFavorite(String teamId) => _ids.contains(teamId);
+
+  bool isHidden(String teamId) => _hiddenIds.contains(teamId);
+
+  /// Update the UI only after the preference has been saved.
+  Future<void> setHidden(String teamId, bool hidden) async {
+    final next = {..._hiddenIds};
+
+    if (hidden) {
+      next.add(teamId);
+    } else {
+      next.remove(teamId);
+    }
+
+    final saved = await _prefs.setStringList(
+      _hiddenKey,
+      next.toList()..sort(),
+    );
+
+    if (!saved) {
+      throw StateError('Could not save hidden teams');
+    }
+
+    _hiddenIds = next;
+    notifyListeners();
+  }
 
   /// Same two teams count as one matchup regardless of order.
   static String matchupKey(String a, String b) {
@@ -45,8 +78,6 @@ class FavoritesStore extends ChangeNotifier {
 
     notifyListeners();
   }
-
-  bool isFavorite(String teamId) => _ids.contains(teamId);
 
   Future<void> toggle(String teamId) async {
     if (_ids.contains(teamId)) {
