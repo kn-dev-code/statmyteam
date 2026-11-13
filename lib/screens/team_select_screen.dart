@@ -1,8 +1,8 @@
-
 import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../search/stats_search_delegate.dart';
+import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
@@ -25,7 +25,7 @@ class TeamSelectScreen extends StatefulWidget {
   final TeamSelectMode mode;
   final Team? preselected;
 
-  /// When set (from the sport picker), only that sport's teams are listed.
+  /// When set, only that sport's teams are listed.
   final Sport? sport;
   final double bottomInset;
 
@@ -39,12 +39,14 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   League? _league;
   Sport? _sport;
 
+  bool _showHidden = false;
+  bool _savingHidden = false;
+
   bool get _isMatchup => widget.mode == TeamSelectMode.matchup;
 
   @override
   void initState() {
     super.initState();
-
     _a = widget.preselected;
     _league = widget.preselected?.league;
     _sport = widget.sport ?? widget.preselected?.sport;
@@ -52,6 +54,7 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
 
   void _selectSport(Sport sport) {
     if (_sport == sport) return;
+
     setState(() {
       _sport = sport;
       _league = null;
@@ -93,6 +96,36 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
     });
   }
 
+  Future<void> _setTeamHidden(Team team, bool hidden) async {
+    if (_savingHidden) return;
+
+    final store = FavoritesScope.of(context);
+    setState(() => _savingHidden = true);
+
+    try {
+      await store.setHidden(team.id, hidden);
+
+      if (!mounted) return;
+
+      setState(() {
+        if (hidden && _a?.id == team.id) _a = null;
+        if (hidden && _b?.id == team.id) _b = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save hidden teams. Try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _savingHidden = false);
+      }
+    }
+  }
+
   void _clearSelection() {
     setState(() {
       _a = null;
@@ -117,9 +150,11 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   Widget build(BuildContext context) {
     final repo = StatsScope.of(context);
     final sports = repo.sports;
+
     final sport = _sport != null && sports.contains(_sport)
         ? _sport!
         : (sports.isEmpty ? null : sports.first);
+
     final leagues = repo.leaguesFor(sport);
 
     if (leagues.isEmpty) {
@@ -158,7 +193,23 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
         ? _league!
         : leagues.first;
 
-    final conferences = repo.teamsByConference(league, sport: sport);
+    final hiddenTeams = FavoritesScope.of(context);
+    final allConferences = repo.teamsByConference(
+      league,
+      sport: sport,
+    );
+
+    final conferences = <String, List<Team>>{};
+
+    for (final entry in allConferences.entries) {
+      final visible = entry.value.where(
+        (team) => _showHidden || !hiddenTeams.isHidden(team.id),
+      ).toList();
+
+      if (visible.isNotEmpty) {
+        conferences[entry.key] = visible;
+      }
+    }
 
     return Scaffold(
       appBar: PillAppBar(
@@ -180,7 +231,6 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
           ),
         ],
       ),
-
       bottomNavigationBar: _isMatchup
           ? SafeArea(
               child: Padding(
@@ -195,9 +245,13 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                       children: [
                         if (_a != null || _b != null) ...[
                           TextButton.icon(
-                            key: const ValueKey('clear_matchup_selection'),
+                            key: const ValueKey(
+                              'clear_matchup_selection',
+                            ),
                             onPressed: _clearSelection,
-                            icon: const Icon(Icons.restart_alt_rounded),
+                            icon: const Icon(
+                              Icons.restart_alt_rounded,
+                            ),
                             label: const Text('Clear selection'),
                           ),
                           const SizedBox(height: 4),
@@ -218,7 +272,6 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
               ),
             )
           : null,
-
       body: ContentWidth(
         child: SingleChildScrollView(
           key: const ValueKey('team_selection_scroll'),
@@ -231,6 +284,19 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              SwitchListTile.adaptive(
+                key: const ValueKey('show_hidden_teams'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Show hidden teams'),
+                subtitle: const Text(
+                  'Use the eye button beside a team to hide or restore it.',
+                ),
+                value: _showHidden,
+                onChanged: (value) {
+                  setState(() => _showHidden = value);
+                },
+              ),
+              const SizedBox(height: 8),
               if (widget.sport == null && sports.length > 1) ...[
                 _SportPills(
                   sports: sports,
@@ -248,7 +314,6 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                 ),
                 const SizedBox(height: 14),
               ],
-
               if (_isMatchup) ...[
                 StatCard(
                   padding: const EdgeInsets.fromLTRB(
@@ -264,13 +329,10 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                           label: 'Team A',
                           team: _a,
                           onClear: () {
-                            setState(() {
-                              _a = null;
-                            });
+                            setState(() => _a = null);
                           },
                         ),
                       ),
-
                       Container(
                         width: 40,
                         height: 40,
@@ -288,15 +350,12 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                           ),
                         ),
                       ),
-
                       Expanded(
                         child: _Slot(
                           label: 'Team B',
                           team: _b,
                           onClear: () {
-                            setState(() {
-                              _b = null;
-                            });
+                            setState(() => _b = null);
                           },
                         ),
                       ),
@@ -325,7 +384,9 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                                   : _a == null
                                       ? '1 of 2 teams selected — choose Team A.'
                                       : '1 of 2 teams selected — choose Team B.',
-                          key: const ValueKey('matchup_selection_status'),
+                          key: const ValueKey(
+                            'matchup_selection_status',
+                          ),
                           style: TextStyle(
                             color: AppColors.muted,
                             fontSize: 13,
@@ -338,7 +399,6 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
@@ -352,9 +412,7 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 8),
-
               if (conferences.isEmpty)
                 const StatCard(
                   child: Padding(
@@ -364,7 +422,7 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                         Icon(Icons.info_outline_rounded, size: 32),
                         SizedBox(height: 12),
                         Text(
-                          'No teams in this league',
+                          'No visible teams',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -372,17 +430,15 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          'Try selecting another league.',
+                          'Turn on Show hidden teams or select another league.',
                           textAlign: TextAlign.center,
                         ),
                       ],
                     ),
                   ),
                 ),
-
               for (final entry in conferences.entries) ...[
                 SectionTitle('${entry.key} Conference'),
-
                 StatCard(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
@@ -398,7 +454,16 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
                                   : null,
                           showChevron: !_isMatchup,
                           scoringLabel: team.sport.scoringLabel,
-                          onTap: () => _onTeamTap(team),
+                          hidden: hiddenTeams.isHidden(team.id),
+                          onToggleHidden: _savingHidden
+                              ? null
+                              : () => _setTeamHidden(
+                                    team,
+                                    !hiddenTeams.isHidden(team.id),
+                                  ),
+                          onTap: hiddenTeams.isHidden(team.id)
+                              ? null
+                              : () => _onTeamTap(team),
                         ),
                     ],
                   ),
@@ -412,7 +477,6 @@ class _TeamSelectScreenState extends State<TeamSelectScreen> {
   }
 }
 
-/// NFL and NCAA league selection.
 class _SportPills extends StatelessWidget {
   const _SportPills({
     required this.sports,
@@ -431,7 +495,8 @@ class _SportPills extends StatelessWidget {
       child: Row(
         children: [
           for (final sport in sports) ...[
-            if (sport != sports.first) const SizedBox(width: 8),
+            if (sport != sports.first)
+              const SizedBox(width: 8),
             ChoiceChip(
               key: ValueKey('sport_${sport.name}'),
               label: Text(sport.label),
@@ -467,7 +532,6 @@ class _LeaguePills extends StatelessWidget {
           for (final league in leagues) ...[
             if (league != leagues.first)
               const SizedBox(width: 8),
-
             Tooltip(
               message: league.level,
               child: Material(
@@ -507,10 +571,14 @@ class _LeaguePills extends StatelessWidget {
                                   : switch (sport ?? Sport.football) {
                                       Sport.basketball =>
                                         Icons.sports_basketball,
-                                      Sport.soccer => Icons.sports_soccer,
-                                      Sport.baseball => Icons.sports_baseball,
-                                      Sport.hockey => Icons.sports_hockey,
-                                      Sport.football => Icons.sports_football,
+                                      Sport.soccer =>
+                                        Icons.sports_soccer,
+                                      Sport.baseball =>
+                                        Icons.sports_baseball,
+                                      Sport.hockey =>
+                                        Icons.sports_hockey,
+                                      Sport.football =>
+                                        Icons.sports_football,
                                     },
                               size: 20,
                               color: AppColors.ink,
@@ -518,7 +586,6 @@ class _LeaguePills extends StatelessWidget {
                           ),
                           const SizedBox(width: 10),
                         ],
-
                         SizedBox(
                           height: 40,
                           child: Center(
@@ -547,7 +614,6 @@ class _LeaguePills extends StatelessWidget {
   }
 }
 
-/// Displays a selected team or an empty selection slot.
 class _Slot extends StatelessWidget {
   const _Slot({
     required this.label,
@@ -590,13 +656,11 @@ class _Slot extends StatelessWidget {
                       team: selectedTeam,
                       size: 72,
                     ),
-
                     Positioned(
                       right: -10,
                       top: -10,
                       child: IconButton(
-                        tooltip:
-                            'Remove ${selectedTeam.name}',
+                        tooltip: 'Remove ${selectedTeam.name}',
                         onPressed: onClear,
                         icon: const Icon(
                           Icons.close_rounded,
@@ -614,9 +678,7 @@ class _Slot extends StatelessWidget {
                   ],
                 ),
         ),
-
         const SizedBox(height: 8),
-
         Text(
           selectedTeam?.name ?? label,
           maxLines: 1,
@@ -628,7 +690,6 @@ class _Slot extends StatelessWidget {
                 : AppColors.text,
           ),
         ),
-
         Text(
           selectedTeam?.record ?? 'Pick a team',
           style: TextStyle(
@@ -641,7 +702,6 @@ class _Slot extends StatelessWidget {
   }
 }
 
-/// Individual selectable team row.
 class _TeamRow extends StatelessWidget {
   const _TeamRow({
     super.key,
@@ -650,13 +710,17 @@ class _TeamRow extends StatelessWidget {
     this.selectedAs,
     this.showChevron = false,
     this.scoringLabel = 'PPG',
+    this.hidden = false,
+    this.onToggleHidden,
   });
 
   final Team team;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? selectedAs;
   final bool showChevron;
   final String scoringLabel;
+  final bool hidden;
+  final VoidCallback? onToggleHidden;
 
   @override
   Widget build(BuildContext context) {
@@ -670,12 +734,10 @@ class _TeamRow extends StatelessWidget {
         horizontal: 16,
         vertical: 2,
       ),
-
       leading: TeamBadge(
         team: team,
         size: 46,
       ),
-
       title: Text(
         team.displayName,
         key: ValueKey('team_name_${team.id}'),
@@ -684,7 +746,6 @@ class _TeamRow extends StatelessWidget {
           color: AppColors.text,
         ),
       ),
-
       subtitle: Text(
         '${team.record} · '
         '${team.stat('ppg').toStringAsFixed(team.sport == Sport.soccer ? 2 : 1)} '
@@ -695,9 +756,23 @@ class _TeamRow extends StatelessWidget {
           fontSize: 12,
         ),
       ),
-
-      trailing: selected
-          ? CircleAvatar(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            key: ValueKey('hide_team_${team.id}'),
+            tooltip: hidden
+                ? 'Restore ${team.displayName}'
+                : 'Hide ${team.displayName}',
+            icon: Icon(
+              hidden
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+            ),
+            onPressed: onToggleHidden,
+          ),
+          if (selected)
+            CircleAvatar(
               radius: 15,
               backgroundColor: AppColors.ink,
               child: Text(
@@ -708,12 +783,13 @@ class _TeamRow extends StatelessWidget {
                 ),
               ),
             )
-          : showChevron
-              ? Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.muted,
-                )
-              : null,
+          else if (showChevron)
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.muted,
+            ),
+        ],
+      ),
     );
   }
 }
