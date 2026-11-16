@@ -43,6 +43,9 @@ class SportStats {
     'SF': ['gp', 'pts', 'reb', 'ast', 'fgPct', 'threePct', 'stl', 'blk'],
     'PF': ['gp', 'pts', 'reb', 'ast', 'fgPct', 'blk', 'stl'],
     'C': ['gp', 'pts', 'reb', 'ast', 'fgPct', 'blk', 'stl'],
+    // ESPN rosters only distinguish guard / forward.
+    'G': ['gp', 'pts', 'ast', 'reb', 'fgPct', 'threePct', 'stl', 'tov'],
+    'F': ['gp', 'pts', 'reb', 'ast', 'fgPct', 'threePct', 'stl', 'blk'],
   };
 
   static const _soccerPlayerKeys = <String, List<String>>{
@@ -107,6 +110,8 @@ class SportStats {
             'SF' => 'Small forward',
             'PF' => 'Power forward',
             'C' => 'Center',
+            'G' => 'Guard',
+            'F' => 'Forward',
             _ => position,
           },
         Sport.soccer => switch (position) {

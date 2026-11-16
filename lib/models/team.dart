@@ -54,7 +54,10 @@ class Team {
 
   String get record => draws > 0 ? '$wins-$losses-$draws' : '$wins-$losses';
 
-  String get displayName => '$city $name';
+  /// `Seattle Rainiers`; just the name when it already includes the city
+  /// (soccer clubs such as `Atlanta United FC`).
+  String get displayName =>
+      city.isEmpty || name.contains(city) ? name : '$city $name';
 
   Team copyWith({
     String? id,

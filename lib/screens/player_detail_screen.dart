@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
+import '../widgets/player_stats_loader.dart';
 import '../widgets/stats_widgets.dart';
 
 class PlayerDetailScreen extends StatelessWidget {
@@ -26,29 +27,40 @@ class PlayerDetailScreen extends StatelessWidget {
           children: [
             PlayerSummaryCard(player: player, team: team),
             const SectionTitle('Season stats'),
-            StatCard(
-              child: StatGrid(
-                items: [
-                  for (final def in stats)
-                    (
-                      label: def.label,
-                      value: player.seasonStats.containsKey(def.key)
-                          ? def.format(player.stat(def.key))
-                          : '—',
+            PlayerStatsLoader(
+              players: [player],
+              builder: (context, loaded) {
+                final withStats = loaded.single;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    StatCard(
+                      child: StatGrid(
+                        items: [
+                          for (final def in stats)
+                            (
+                              label: def.label,
+                              value: withStats.seasonStats.containsKey(def.key)
+                                  ? def.format(withStats.stat(def.key))
+                                  : '—',
+                            ),
+                        ],
+                      ),
                     ),
-                ],
-              ),
-            ),
-            const SectionTitle(
-              'Stat profile',
-              subtitle: 'Selected season totals',
-            ),
-            StatCard(
-              child: PlayerStatBarsChart(
-                defs: stats,
-                player: player,
-                color: color,
-              ),
+                    const SectionTitle(
+                      'Stat profile',
+                      subtitle: 'Selected season totals',
+                    ),
+                    StatCard(
+                      child: PlayerStatBarsChart(
+                        defs: stats,
+                        player: withStats,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/models.dart';
 import '../state/settings_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -73,7 +74,7 @@ class SettingsTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          repo.isLive ? 'Live NFL data' : 'Sample data',
+                          repo.isLive ? 'Live data' : 'Sample data',
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
@@ -81,11 +82,18 @@ class SettingsTab extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          repo.isLive
-                              ? 'Teams and rosters load from ESPN. NCAA uses '
-                                    'sample data.'
-                              : 'Teams and players are fictional while '
-                                    'testing.',
+                          !repo.isLive
+                              ? 'Teams and players are fictional while '
+                                    'testing.'
+                              : repo.sampleLeagues.isEmpty
+                              ? 'Teams, rosters, games, and player stats '
+                                    'load from ESPN.'
+                              : '${League.describe(repo.liveLeagues)} load '
+                                    'from ESPN. '
+                                    '${League.describe(repo.sampleLeagues)} '
+                                    'could not load and '
+                                    '${repo.sampleLeagues.length == 1 ? 'uses' : 'use'} '
+                                    'sample data.',
                           style: TextStyle(
                             color: AppColors.muted,
                             fontSize: 12.5,

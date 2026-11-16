@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models/team.dart';
+import '../data/stats_repository.dart';
+import '../models/models.dart';
 import '../search/stats_search_delegate.dart';
 import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
@@ -87,6 +88,48 @@ void _open(BuildContext context, Widget screen) =>
 
 void _search(BuildContext context) =>
     showSearch(context: context, delegate: StatsSearchDelegate());
+
+/// Per-league detail behind the home "feed unavailable" banner.
+void _showFeedProblems(BuildContext context, StatsRepository repo) {
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Live data problems'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final MapEntry(key: league, value: error)
+                in repo.loadErrors.entries) ...[
+              Text(
+                '${league.label}: showing sample data',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(error),
+              const SizedBox(height: 12),
+            ],
+            for (final MapEntry(key: league, value: warning)
+                in repo.loadWarnings.entries) ...[
+              Text(
+                '${league.label}: live, incomplete',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(warning),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
 
 /// Saved matchups as team pairs, skipping ids no longer in the data set.
 List<(Team, Team)> _savedMatchups(BuildContext context) {
@@ -229,28 +272,49 @@ class _HomeTab extends StatelessWidget {
             FloatingNavBar.clearance,
           ),
           children: [
-            if (repo.loadError != null) ...[
-              StatCard(
-                color: AppColors.orange.withValues(alpha: 0.16),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 18,
-                      color: AppColors.gold,
+            if (repo.loadErrors.isNotEmpty ||
+                repo.loadWarnings.isNotEmpty) ...[
+              Semantics(
+                button: true,
+                hint: 'Shows which live data failed to load',
+                child: GestureDetector(
+                  onTap: () => _showFeedProblems(context, repo),
+                  child: StatCard(
+                    color: AppColors.orange.withValues(alpha: 0.16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
                     ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Live NFL feed unavailable — showing sample data.',
-                        style: TextStyle(fontSize: 13),
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.wifi_off_rounded,
+                          size: 18,
+                          color: AppColors.gold,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            [
+                              if (repo.loadErrors.isNotEmpty)
+                                'Live ${League.describe(repo.loadErrors.keys)} '
+                                    '${repo.loadErrors.length == 1 ? 'feed' : 'feeds'} '
+                                    'unavailable — showing sample data.',
+                              if (repo.loadWarnings.isNotEmpty)
+                                'Some ${League.describe(repo.loadWarnings.keys)} '
+                                    'data is missing.',
+                            ].join(' '),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 18,
+                          color: AppColors.muted,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -362,11 +426,15 @@ class _HomeTab extends StatelessWidget {
               ],
             const SizedBox(height: 20),
             Text(
-              repo.isLive
-                  ? 'NFL teams and rosters load from ESPN. NCAA, NBA, and MLS '
-                        'sample data remains available for browsing.'
-                  : 'Sample league data: teams and players are fictional '
-                        'while testing.',
+              !repo.isLive
+                  ? 'Sample league data: teams and players are fictional '
+                        'while testing.'
+                  : repo.sampleLeagues.isEmpty
+                  ? 'Teams, rosters, games, and stats load live from ESPN.'
+                  : '${League.describe(repo.liveLeagues)} data loads live from '
+                        'ESPN. ${League.describe(repo.sampleLeagues)} '
+                        '${repo.sampleLeagues.length == 1 ? 'shows' : 'show'} '
+                        'sample data.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.muted, fontSize: 12),
             ),

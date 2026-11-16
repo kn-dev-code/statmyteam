@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
+import '../widgets/player_stats_loader.dart';
 import '../widgets/stats_widgets.dart';
 import 'player_detail_screen.dart';
 
@@ -104,7 +105,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
               runSpacing: 8,
               children: [
                 if (_isFootball)
-                  for (final group in PositionGroup.values)
+                  for (final group in PositionGroup.comparable)
                     ChoiceChip(
                       label: Text(group.shortLabel),
                       selected: _group == group,
@@ -168,42 +169,10 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                     style: TextStyle(color: AppColors.gold, fontSize: 13),
                   ),
                 ),
-              _EdgeSummary(a: a, b: b, colorA: colorA, colorB: colorB),
-              StatCard(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        children: [
-                          Text(
-                            a.lastName,
-                            style: TextStyle(
-                              color: colorA,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            b.lastName,
-                            style: TextStyle(
-                              color: colorB,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    for (final def in SportStats.forComparison(a, b))
-                      StatCompareRow(
-                        def: def,
-                        valueA: a.seasonStats[def.key],
-                        valueB: b.seasonStats[def.key],
-                        colorA: colorA,
-                        colorB: colorB,
-                      ),
-                  ],
-                ),
+              PlayerStatsLoader(
+                players: [a, b],
+                builder: (context, loaded) =>
+                    _comparison(loaded[0], loaded[1], colorA, colorB),
               ),
             ] else
               StatCard(
@@ -215,6 +184,53 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Edge summary + stat-by-stat table, built once both players' season
+  /// stats have loaded.
+  Widget _comparison(Player a, Player b, Color colorA, Color colorB) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _EdgeSummary(a: a, b: b, colorA: colorA, colorB: colorB),
+        StatCard(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Text(
+                      a.lastName,
+                      style: TextStyle(
+                        color: colorA,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      b.lastName,
+                      style: TextStyle(
+                        color: colorB,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              for (final def in SportStats.forComparison(a, b))
+                StatCompareRow(
+                  def: def,
+                  valueA: a.seasonStats[def.key],
+                  valueB: b.seasonStats[def.key],
+                  colorA: colorA,
+                  colorB: colorB,
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

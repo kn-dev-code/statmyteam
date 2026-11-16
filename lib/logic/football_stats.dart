@@ -32,17 +32,25 @@ class StatDef {
 /// Position groupings used for roster sections and player comparison.
 enum PositionGroup {
   quarterback('QB', 'Quarterbacks', {'QB'}),
-  runningBack('RB', 'Running backs', {'RB'}),
+  runningBack('RB', 'Running backs', {'RB', 'FB'}),
   receiver('WR / TE', 'Receivers', {'WR', 'TE'}),
-  frontSeven('Front 7', 'Front seven', {'DE', 'DT', 'LB'}),
-  secondary('DB', 'Secondary', {'CB', 'S'}),
-  specialTeams('K', 'Special teams', {'K', 'P'});
+  offensiveLine('OL', 'Offensive line', {'OL'}),
+  frontSeven('Front 7', 'Front seven', {'DE', 'DT', 'DL', 'LB'}),
+  secondary('DB', 'Secondary', {'CB', 'S', 'DB'}),
+  specialTeams('K', 'Special teams', {'K', 'P', 'LS'});
 
   const PositionGroup(this.shortLabel, this.label, this.positions);
 
   final String shortLabel;
   final String label;
   final Set<String> positions;
+
+  /// Groups with stats worth comparing. Offensive linemen are listed on
+  /// rosters, but no per-player stats are published for them.
+  static List<PositionGroup> get comparable => [
+        for (final group in values)
+          if (group != offensiveLine) group,
+      ];
 
   static PositionGroup of(String position) => PositionGroup.values.firstWhere(
         (group) => group.positions.contains(position),
@@ -107,13 +115,16 @@ class FootballStats {
   static const _keysByPosition = <String, List<String>>{
     'QB': ['gp', 'compPct', 'passYds', 'passTd', 'intThrown', 'rating', 'rushYds', 'rushTd'],
     'RB': ['gp', 'rushAtt', 'rushYds', 'ypc', 'rushTd', 'rec', 'recYds', 'fum'],
+    'FB': ['gp', 'rushAtt', 'rushYds', 'ypc', 'rushTd', 'rec', 'recYds', 'fum'],
     'WR': ['gp', 'tgt', 'rec', 'recYds', 'ypr', 'recTd'],
     'TE': ['gp', 'tgt', 'rec', 'recYds', 'ypr', 'recTd'],
     'DE': ['gp', 'tkl', 'sacks', 'tfl', 'qbHits', 'ff'],
     'DT': ['gp', 'tkl', 'sacks', 'tfl', 'qbHits', 'ff'],
+    'DL': ['gp', 'tkl', 'sacks', 'tfl', 'qbHits', 'ff'],
     'LB': ['gp', 'tkl', 'sacks', 'tfl', 'defInt', 'pd', 'ff'],
     'CB': ['gp', 'tkl', 'defInt', 'pd', 'ff'],
     'S': ['gp', 'tkl', 'defInt', 'pd', 'ff'],
+    'DB': ['gp', 'tkl', 'defInt', 'pd', 'ff'],
     'K': ['gp', 'fgm', 'fga', 'fgPct', 'long', 'xpPct'],
   };
 
@@ -139,14 +150,19 @@ class FootballStats {
   static const positionNames = <String, String>{
     'QB': 'Quarterback',
     'RB': 'Running back',
+    'FB': 'Fullback',
     'WR': 'Wide receiver',
     'TE': 'Tight end',
+    'OL': 'Offensive lineman',
     'DE': 'Defensive end',
     'DT': 'Defensive tackle',
+    'DL': 'Defensive lineman',
     'LB': 'Linebacker',
     'CB': 'Cornerback',
     'S': 'Safety',
+    'DB': 'Defensive back',
     'K': 'Kicker',
     'P': 'Punter',
+    'LS': 'Long snapper',
   };
 }

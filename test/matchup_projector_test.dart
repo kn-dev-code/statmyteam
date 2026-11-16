@@ -67,9 +67,9 @@ void main() {
     expect(h2h.favors, aus);
   });
 
-  test('every football team has a starter in every position group', () {
+  test('every football team has a starter in every comparable group', () {
     for (final team in repo.teams.where((t) => t.sport == Sport.football)) {
-      for (final group in PositionGroup.values) {
+      for (final group in PositionGroup.comparable) {
         expect(
           repo.rosterInGroup(team.id, group).any((p) => p.isStarter),
           isTrue,

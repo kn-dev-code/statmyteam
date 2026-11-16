@@ -37,7 +37,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   Future<_Boot> _load() async {
     final favorites = FavoritesStore.open();
     final settings = SettingsStore.open();
-    final repo = StatsRepository.liveFootball();
+    final repo = StatsRepository.live();
 
     return (
       repo: await repo,
@@ -108,7 +108,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
                   children: [
                     CircularProgressIndicator(),
                     SizedBox(height: 16),
-                    Text('Loading NFL data…'),
+                    Text('Loading live league data…'),
                   ],
                 ),
               ),
