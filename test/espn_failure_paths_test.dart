@@ -228,7 +228,19 @@ void main() {
       expect(repo.loadErrors[League.nba], contains('longer than'));
     });
 
-    test('a parser bug is rethrown, not masked as sample data', () async {
+    test('a bug (non-feed error) is rethrown, not masked as sample data',
+        () async {
+      await expectLater(
+        StatsRepository.live(
+          client: MockClient((_) async => throw StateError('bug')),
+          leagues: const [EspnLeague.nba],
+          retryDelay: Duration.zero,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('a malformed field reads as missing data, not a crash', () async {
       final routes = nbaFeed()
         ..[standingsPath] = {
           'children': [
@@ -238,14 +250,28 @@ void main() {
             },
           ],
         };
-      await expectLater(
-        StatsRepository.live(
-          client: serve(routes),
-          leagues: const [EspnLeague.nba],
-          retryDelay: Duration.zero,
-        ),
-        throwsA(isA<TypeError>()),
+      final repo = await StatsRepository.live(
+        client: serve(routes),
+        leagues: const [EspnLeague.nba],
+        retryDelay: Duration.zero,
       );
+      expect(repo.liveLeagues, isEmpty);
+      expect(repo.loadErrors[League.nba], contains('no NBA standings'));
+    });
+
+    test('a failing standings request is caught while the scoreboard hangs',
+        () async {
+      final repo = await StatsRepository.live(
+        client: MockClient((request) async {
+          if (request.url.path == '$site/scoreboard') {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          }
+          return http.Response('boom', 500);
+        }),
+        leagues: const [EspnLeague.nba],
+        retryDelay: Duration.zero,
+      );
+      expect(repo.loadErrors[League.nba], contains('500'));
     });
   });
 

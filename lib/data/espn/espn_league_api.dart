@@ -76,8 +76,10 @@ class EspnLeagueApi {
       'team list',
     );
 
-    final scoreboard = await scoreboardFuture;
+    // Await standings first: it is the only one of the three that can throw,
+    // and its error must be observed now, not after the scoreboard settles.
     final standingsJson = await standingsFuture;
+    final scoreboard = await scoreboardFuture;
     final standings = _parseStandings(standingsJson);
     if (standings.isEmpty) {
       throw EspnDataException(
@@ -219,7 +221,7 @@ class EspnLeagueApi {
 
     void visit(Map<String, dynamic> node, String? conferenceLabel) {
       final label = conferenceLabel ?? _groupLabel(node);
-      final entries = (node['standings'] as Map?)?['entries'] as List?;
+      final entries = _list(_map(node['standings'])?['entries']);
       for (final entry in entries ?? const []) {
         if (entry is! Map) continue;
         final team = entry['team'];
@@ -230,17 +232,17 @@ class EspnLeagueApi {
           espnId: id,
           identity: _TeamIdentity.fromJson(team),
           group: league.useDivisions
-              ? (node['name'] as String? ?? label)
+              ? (_str(node['name']) ?? label)
               : label,
-          record: _parseRecord(entry['stats'] as List<dynamic>?),
+          record: _parseRecord(_list(entry['stats'])),
         ));
       }
-      for (final child in (node['children'] as List? ?? const [])) {
+      for (final child in (_list(node['children']) ?? const [])) {
         if (child is Map<String, dynamic>) visit(child, label);
       }
     }
 
-    for (final child in (json['children'] as List? ?? const [])) {
+    for (final child in (_list(json['children']) ?? const [])) {
       if (child is Map<String, dynamic>) visit(child, null);
     }
     return out;
@@ -248,9 +250,9 @@ class EspnLeagueApi {
 
   /// Short conference label: `SEC`, `East`, `AFC`.
   String _groupLabel(Map<String, dynamic> node) {
-    final abbreviation = node['abbreviation'] as String?;
-    final shortName = node['shortName'] as String?;
-    final name = node['name'] as String? ?? league.league.label;
+    final abbreviation = _str(node['abbreviation']);
+    final shortName = _str(node['shortName']);
+    final name = _str(node['name']) ?? league.league.label;
     // College abbreviations are slugs like `big12`; prefer the short name.
     if (league.league.isAmateur) return shortName ?? name;
     return abbreviation ?? shortName ?? name;
@@ -287,7 +289,7 @@ class EspnLeagueApi {
     }
     final leagues = scoreboard?['leagues'];
     if (leagues is List && leagues.isNotEmpty) {
-      final year = (leagues.first as Map?)?['season']?['year'];
+      final year = _map(_map(leagues.first)?['season'])?['year'];
       if (year is num) return year.toInt();
     }
     return null;
@@ -347,7 +349,7 @@ class EspnLeagueApi {
     // Football rosters are grouped ({position, items: [...]}); basketball and
     // soccer rosters are a flat athlete list.
     final athletes = <Map<String, dynamic>>[];
-    for (final entry in (json['athletes'] as List? ?? const [])) {
+    for (final entry in (_list(json['athletes']) ?? const [])) {
       if (entry is! Map<String, dynamic>) continue;
       final items = entry['items'];
       if (items is List) {
@@ -361,9 +363,9 @@ class EspnLeagueApi {
     final players = <Player>[];
     for (final map in athletes) {
       final rawPosition =
-          (map['position'] as Map?)?['abbreviation'] as String? ?? '';
+          _str(_map(map['position'])?['abbreviation']) ?? '';
       final position = league.position(rawPosition);
-      final injuries = map['injuries'] as List<dynamic>? ?? const [];
+      final injuries = _list(map['injuries']) ?? const [];
       final experience = map['experience'];
       final college = map['college'];
       final depth = countByPosition[position] ?? 0;
@@ -372,26 +374,26 @@ class EspnLeagueApi {
       players.add(
         Player(
           id: league.playerId('${map['id']}'),
-          firstName: map['firstName'] as String? ?? '',
-          lastName: map['lastName'] as String? ??
-              (map['displayName'] as String? ?? 'Player'),
+          firstName: _str(map['firstName']) ?? '',
+          lastName: _str(map['lastName']) ??
+              (_str(map['displayName']) ?? 'Player'),
           teamId: teamId,
           position: position,
           jerseyNumber: int.tryParse('${map['jersey'] ?? ''}') ?? 0,
           sport: league.sport,
           status: _playerStatus(map['status'], injuries),
           injuryNote: _injuryNote(injuries),
-          age: (map['age'] as num?)?.toInt(),
-          heightInches: (map['height'] as num?)?.round(),
-          weightLbs: (map['weight'] as num?)?.round(),
+          age: (_num(map['age']))?.toInt(),
+          heightInches: (_num(map['height']))?.round(),
+          weightLbs: (_num(map['weight']))?.round(),
           yearsPro: !league.league.isAmateur && experience is Map
-              ? (experience['years'] as num?)?.toInt()
+              ? (_num(experience['years']))?.toInt()
               : null,
           classYear: league.league.isAmateur && experience is Map
-              ? experience['displayValue'] as String?
+              ? _str(experience['displayValue'])
               : null,
           college: college is Map
-              ? college['shortName'] as String? ?? college['name'] as String?
+              ? _str(college['shortName']) ?? _str(college['name'])
               : null,
           // ESPN does not publish depth charts here; roster order is the
           // best available signal.
@@ -409,11 +411,11 @@ class EspnLeagueApi {
   String? _injuryNote(List<dynamic> injuries) {
     if (injuries.isEmpty || injuries.first is! Map) return null;
     final first = injuries.first as Map;
-    return first['detail'] as String? ?? first['description'] as String?;
+    return _str(first['detail']) ?? _str(first['description']);
   }
 
   PlayerStatus _playerStatus(dynamic status, List<dynamic> injuries) {
-    final type = status is Map ? status['type'] as String? : null;
+    final type = status is Map ? _str(status['type']) : null;
     if (type != null) {
       final lower = type.toLowerCase();
       if (lower.contains('injured') || lower == 'ir') {
@@ -443,15 +445,15 @@ class EspnLeagueApi {
   }) {
     if (json == null) return;
     final now = DateTime.now();
-    for (final event in (json['events'] as List? ?? const [])) {
+    for (final event in (_list(json['events']) ?? const [])) {
       if (event is! Map<String, dynamic>) continue;
-      final competitions = event['competitions'] as List? ?? const [];
+      final competitions = _list(event['competitions']) ?? const [];
       if (competitions.isEmpty || competitions.first is! Map) continue;
       final comp = competitions.first as Map<String, dynamic>;
       final statusType =
-          ((comp['status'] as Map?)?['type'] as Map?) ?? const {};
-      final statusName = statusType['name'] as String? ?? '';
-      final statusState = statusType['state'] as String? ?? '';
+          _map(_map(comp['status'])?['type']) ?? const {};
+      final statusName = _str(statusType['name']) ?? '';
+      final statusState = _str(statusType['state']) ?? '';
       final completed =
           statusType['completed'] == true || statusName == 'STATUS_FINAL';
       final live = statusState == 'in' ||
@@ -464,7 +466,7 @@ class EspnLeagueApi {
 
       Map<String, dynamic>? home;
       Map<String, dynamic>? away;
-      for (final c in (comp['competitors'] as List? ?? const [])) {
+      for (final c in (_list(comp['competitors']) ?? const [])) {
         if (c is! Map<String, dynamic>) continue;
         if (c['homeAway'] == 'home') {
           home = c;
@@ -474,8 +476,8 @@ class EspnLeagueApi {
       }
       if (home == null || away == null) continue;
 
-      final start = DateTime.tryParse(event['date'] as String? ?? '') ??
-          DateTime.tryParse(comp['date'] as String? ?? '');
+      final start = DateTime.tryParse(_str(event['date']) ?? '') ??
+          DateTime.tryParse(_str(comp['date']) ?? '');
       if (start == null) continue;
       if (!completed && !live && !start.isAfter(now)) continue;
 
@@ -493,7 +495,7 @@ class EspnLeagueApi {
           awayTeamId: awayId,
           home: TeamBoxScore(teamId: homeId, score: _score(home!)),
           away: TeamBoxScore(teamId: awayId, score: _score(away!)),
-          venue: (comp['venue'] as Map?)?['fullName'] as String?,
+          venue: _str(_map(comp['venue'])?['fullName']),
           status: completed
               ? GameStatus.completed
               : (live ? GameStatus.live : GameStatus.scheduled),
@@ -519,9 +521,9 @@ class EspnLeagueApi {
         sport: league.sport,
         season: '',
         league: league.league,
-        primaryColor: _parseColor(team['color'] as String?, 0xFF8A8F98),
+        primaryColor: _parseColor(_str(team['color']), 0xFF8A8F98),
         secondaryColor:
-            _parseColor(team['alternateColor'] as String?, 0xFFFFFFFF),
+            _parseColor(_str(team['alternateColor']), 0xFFFFFFFF),
       );
     }
     return id;
@@ -589,15 +591,15 @@ class _TeamIdentity {
   final String abbreviation;
 
   factory _TeamIdentity.fromJson(Map<String, dynamic> json) {
-    final location = json['location'] as String? ?? '';
-    final name = json['name'] as String? ??
-        json['nickname'] as String? ??
-        json['shortDisplayName'] as String? ??
+    final location = _str(json['location']) ?? '';
+    final name = _str(json['name']) ??
+        _str(json['nickname']) ??
+        _str(json['shortDisplayName']) ??
         'Team';
     final city = location == name
-        ? json['shortDisplayName'] as String? ?? location
+        ? _str(json['shortDisplayName']) ?? location
         : location;
-    return _TeamIdentity(city, name, json['abbreviation'] as String? ?? 'TM');
+    return _TeamIdentity(city, name, _str(json['abbreviation']) ?? 'TM');
   }
 }
 
@@ -608,3 +610,10 @@ int _parseColor(String? hex, int fallback) {
   if (value == null) return fallback;
   return cleaned.length <= 6 ? 0xFF000000 | value : value;
 }
+
+// Type-safe JSON readers: a field with an unexpected type reads as absent
+// instead of throwing a TypeError that would take down the whole load.
+String? _str(Object? value) => value is String ? value : null;
+num? _num(Object? value) => value is num ? value : null;
+List<dynamic>? _list(Object? value) => value is List ? value : null;
+Map<dynamic, dynamic>? _map(Object? value) => value is Map ? value : null;

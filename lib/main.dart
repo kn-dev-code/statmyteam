@@ -39,6 +39,9 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     final settings = SettingsStore.open();
     final repo = StatsRepository.live();
 
+    // Wait on all three together so an early failure in one is observed
+    // immediately rather than left unhandled while the slow repo loads.
+    await Future.wait<Object>([favorites, settings, repo]);
     return (
       repo: await repo,
       favorites: await favorites,
