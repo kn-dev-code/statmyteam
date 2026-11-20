@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/matchup_projector.dart';
 import '../logic/sport_stats.dart';
 import '../models/models.dart';
@@ -7,58 +8,64 @@ import '../state/favorites_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_chrome.dart';
+import '../widgets/matchup_card.dart' show projectMatchup;
 import '../widgets/stats_widgets.dart';
 import '../widgets/team_outlook_card.dart';
 import 'player_compare_screen.dart';
 
 /// Two teams side by side with a win projection.
 class MatchupScreen extends StatefulWidget {
-  const MatchupScreen({super.key, required this.teamA, required this.teamB});
+  const MatchupScreen({
+    super.key,
+    required this.teamA,
+    required this.teamB,
+    this.initialVenue = MatchupVenue.teamAHome,
+  });
 
   final Team teamA;
   final Team teamB;
+
+  /// Venue the projection starts with; saved matchups use neutral because
+  /// a saved pair does not record which team is at home.
+  final MatchupVenue initialVenue;
 
   @override
   State<MatchupScreen> createState() => _MatchupScreenState();
 }
 
 class _MatchupScreenState extends State<MatchupScreen> {
-  MatchupVenue _venue = MatchupVenue.teamAHome;
+  late MatchupVenue _venue = widget.initialVenue;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final repo = StatsScope.of(context);
     final favorites = FavoritesScope.of(context);
     final a = widget.teamA;
     final b = widget.teamB;
     final h2h = repo.headToHead(a.id, b.id);
     final saved = favorites.isFavoriteMatchup(a.id, b.id);
+    // Memoized per repository, matchup, and venue.
+    final projection = projectMatchup(context, a, b, venue: _venue);
 
-    final projection = MatchupProjector.project(
-      teamA: a,
-      teamB: b,
-      rosterA: repo.rosterFor(a.id),
-      rosterB: repo.rosterFor(b.id),
-      headToHead: h2h,
-      venue: _venue,
-    );
-
-    final margin = projection.spread < 0.5
-        ? 'Even'
-        : '${projection.favorite.abbreviation} by '
-              '${_trim(projection.spread)}';
+    String outlookSubtitle(Team team) => team.league == null
+        ? l10n.outlookSubtitleNoLeague(team.name)
+        : l10n.outlookSubtitle(team.name, team.league!.label);
 
     return Scaffold(
       appBar: PillAppBar(
-        title: '${a.abbreviation} vs ${b.abbreviation}',
+        title: l10n.matchupTitle(a.abbreviation, b.abbreviation),
         actions: [
           RoundIconButton(
-            tooltip: saved ? 'Remove saved matchup' : 'Save matchup',
+            tooltip: saved ? l10n.removeSavedMatchup : l10n.saveMatchup,
             icon: saved
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
-            iconColor: saved ? AppColors.orange : AppColors.ink,
-            onPressed: () => favorites.toggleMatchup(a.id, b.id),
+            iconColor: saved ? AppColors.orange : context.colors.ink,
+            onPressed: () => saveWithFeedback(
+              context,
+              () => favorites.toggleMatchup(a.id, b.id),
+            ),
           ),
         ],
       ),
@@ -66,143 +73,15 @@ class _MatchupScreenState extends State<MatchupScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            // Crests, projected score, and win probability.
-            StatCard(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const LabelPill('Game preview'),
-                      const Spacer(),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Icon(
-                          _venue == MatchupVenue.neutral
-                              ? Icons.public_rounded
-                              : Icons.stadium_outlined,
-                          size: 22,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _TeamHeader(team: a)),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 26),
-                        child: Column(
-                          children: [
-                            Text(
-                              '${projection.teamAScore.round()} : '
-                              '${projection.teamBScore.round()}',
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.6,
-                              ),
-                            ),
-                            Text(
-                              'Projected',
-                              style: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(child: _TeamHeader(team: b)),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 6),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'WIN PROBABILITY',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: WinProbabilityBar(
-                      teamA: a,
-                      teamB: b,
-                      teamAChance: projection.teamAWinChance,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: MetricPill(label: 'Margin', value: margin),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: MetricPill(
-                          label: 'Combined',
-                          value: projection.projectedTotal.toStringAsFixed(0),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<MatchupVenue>(
-                      showSelectedIcon: false,
-                      segments: [
-                        ButtonSegment(
-                          value: MatchupVenue.teamAHome,
-                          label: Text('@ ${a.abbreviation}'),
-                        ),
-                        const ButtonSegment(
-                          value: MatchupVenue.neutral,
-                          label: Text('Neutral'),
-                        ),
-                        ButtonSegment(
-                          value: MatchupVenue.teamBHome,
-                          label: Text('@ ${b.abbreviation}'),
-                        ),
-                      ],
-                      selected: {_venue},
-                      onSelectionChanged: (s) =>
-                          setState(() => _venue = s.first),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PlayerCompareScreen(teamA: a, teamB: b),
-                      ),
-                    ),
-                    icon: const Icon(Icons.people_alt_outlined),
-                    label: const Text('Compare players'),
-                  ),
-                ],
-              ),
+            _PreviewCard(
+              projection: projection,
+              venue: _venue,
+              onVenueChanged: (venue) => setState(() => _venue = venue),
             ),
 
             // Team stats as a duel grid; better values are green.
             SectionTitle(
-              'Performance',
+              l10n.performance,
               trailing: _Legend(a: a, b: b),
             ),
             StatCard(
@@ -214,20 +93,17 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            SectionTitle(
-              '${a.abbreviation} outlook',
-              subtitle: 'How ${a.name} grades against the ${a.league?.label ?? 'league'}',
-            ),
-            TeamOutlookCard(outlook: TeamOutlook.analyze(a, repo.peersOf(a))),
-            SectionTitle(
-              '${b.abbreviation} outlook',
-              subtitle: 'How ${b.name} grades against the ${b.league?.label ?? 'league'}',
-            ),
-            TeamOutlookCard(outlook: TeamOutlook.analyze(b, repo.peersOf(b))),
+            for (final team in [a, b]) ...[
+              SectionTitle(
+                l10n.outlookTitle(team.abbreviation),
+                subtitle: outlookSubtitle(team),
+              ),
+              TeamOutlookCard(outlook: repo.outlookFor(team)),
+            ],
 
-            const SectionTitle(
-              'What drives the projection',
-              subtitle: 'Season form, scoring margin, venue, and who is out',
+            SectionTitle(
+              l10n.projectionDrivers,
+              subtitle: l10n.projectionDriversSubtitle,
             ),
             StatCard(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -235,16 +111,16 @@ class _MatchupScreenState extends State<MatchupScreen> {
                 children: [
                   for (var i = 0; i < projection.factors.length; i++) ...[
                     if (i > 0) const Divider(indent: 18, endIndent: 18),
-                    _FactorTile(factor: projection.factors[i]),
+                    _FactorTile(factor: projection.factors[i], a: a, b: b),
                   ],
                 ],
               ),
             ),
 
             // Averages from recent completed games, alongside season stats.
-            const SectionTitle(
-              'Recent-game comparison',
-              subtitle: 'Average over up to 5 completed games per team',
+            SectionTitle(
+              l10n.recentComparison,
+              subtitle: l10n.recentComparisonSubtitle(_recentGameCount),
             ),
             StatCard(
               child: _RecentComparison(
@@ -255,43 +131,18 @@ class _MatchupScreenState extends State<MatchupScreen> {
               ),
             ),
 
-            const SectionTitle('Recent form', subtitle: 'Last 5, newest first'),
-            StatCard(
-              child: Column(
-                children: [
-                  for (final team in [a, b])
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          TeamBadge(team: team, size: 40),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              team.name,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          FormStrip(
-                            teamId: team.id,
-                            games: repo.recentGames(team.id),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+            SectionTitle(
+              l10n.recentForm,
+              subtitle: l10n.recentFormSubtitle(_recentGameCount),
             ),
+            _RecentFormCard(teams: [a, b]),
 
-            const SectionTitle('Head-to-head'),
+            SectionTitle(l10n.headToHeadSection),
             StatCard(
               child: h2h.isEmpty
                   ? Text(
-                      'These teams have not met in the last two seasons.',
-                      style: TextStyle(color: AppColors.muted),
+                      l10n.noRecentMeetingsLong,
+                      style: TextStyle(color: context.colors.muted),
                     )
                   : Column(
                       children: [
@@ -301,83 +152,176 @@ class _MatchupScreenState extends State<MatchupScreen> {
                     ),
             ),
 
-            const SectionTitle('Injury report'),
-            StatCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final team in [a, b]) ...[
-                    Row(
-                      children: [
-                        TeamBadge(team: team, size: 28),
-                        const SizedBox(width: 8),
-                        Text(
-                          team.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    if (repo.injuryReport(team.id).isEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: 10),
-                        child: Text(
-                          'No players listed',
-                          style: TextStyle(color: AppColors.muted),
-                        ),
-                      ),
-                    for (final p in repo.injuryReport(team.id))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text.rich(
-                                TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: '${p.position}  ',
-                                      style: TextStyle(
-                                        color: AppColors.muted,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    TextSpan(text: p.fullName),
-                                    if (p.injuryNote != null)
-                                      TextSpan(
-                                        text: ' · ${p.injuryNote}',
-                                        style: TextStyle(
-                                          color: AppColors.muted,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            PlayerStatusChip(status: p.status, compact: true),
-                          ],
-                        ),
-                      ),
-                    if (team == a) ...[
-                      const SizedBox(height: 6),
-                      const Divider(),
-                      const SizedBox(height: 10),
-                    ],
-                  ],
-                ],
-              ),
-            ),
+            SectionTitle(l10n.injuryReport),
+            _InjuryReportCard(teams: [a, b]),
           ],
         ),
       ),
     );
   }
+}
 
-  static String _trim(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+/// How many recent completed games the form and comparison sections use.
+const _recentGameCount = 5;
+
+/// Crests, projected score, win probability, venue toggle.
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({
+    required this.projection,
+    required this.venue,
+    required this.onVenueChanged,
+  });
+
+  final MatchupProjection projection;
+  final MatchupVenue venue;
+  final ValueChanged<MatchupVenue> onVenueChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final a = projection.teamA;
+    final b = projection.teamB;
+    final margin = projection.isPickEm
+        ? l10n.marginEven
+        : l10n.marginBy(
+            projection.favorite.abbreviation,
+            l10n.trimmed(projection.spread),
+          );
+
+    return StatCard(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 18),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              LabelPill(l10n.gamePreview),
+              const Spacer(),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: context.colors.border),
+                ),
+                child: Icon(
+                  venue == MatchupVenue.neutral
+                      ? Icons.public_rounded
+                      : Icons.stadium_outlined,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _TeamHeader(team: a)),
+              Padding(
+                padding: const EdgeInsets.only(top: 26),
+                child: Column(
+                  children: [
+                    Text(
+                      l10n.scoreLine(
+                        l10n.decimal(projection.teamAScore, 0),
+                        l10n.decimal(projection.teamBScore, 0),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    Text(
+                      l10n.projected,
+                      style: TextStyle(
+                        color: context.colors.muted,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: _TeamHeader(team: b)),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l10n.winProbability.toUpperCase(),
+                style: TextStyle(
+                  color: context.colors.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: WinProbabilityBar(
+              teamA: a,
+              teamB: b,
+              teamAChance: projection.teamAWinChance,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: MetricPill(label: l10n.margin, value: margin),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: MetricPill(
+                  label: l10n.combined,
+                  value: l10n.decimal(projection.projectedTotal, 0),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<MatchupVenue>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: MatchupVenue.teamAHome,
+                  label: Text(l10n.venueAt(a.abbreviation)),
+                ),
+                ButtonSegment(
+                  value: MatchupVenue.neutral,
+                  label: Text(l10n.venueNeutral),
+                ),
+                ButtonSegment(
+                  value: MatchupVenue.teamBHome,
+                  label: Text(l10n.venueAt(b.abbreviation)),
+                ),
+              ],
+              selected: {venue},
+              onSelectionChanged: (s) => onVenueChanged(s.first),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => PlayerCompareScreen(teamA: a, teamB: b),
+              ),
+            ),
+            icon: const Icon(Icons.people_alt_outlined),
+            label: Text(l10n.comparePlayers),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TeamHeader extends StatelessWidget {
@@ -403,7 +347,7 @@ class _TeamHeader extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           team.record,
-          style: TextStyle(color: AppColors.muted, fontSize: 13),
+          style: TextStyle(color: context.colors.muted, fontSize: 13),
         ),
       ],
     );
@@ -419,17 +363,17 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle style = const TextStyle(
-      fontWeight: FontWeight.w700,
-      fontSize: 15,
-    );
+    const style = TextStyle(fontWeight: FontWeight.w700, fontSize: 15);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(a.abbreviation, style: style),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 6),
-          child: Text('·', style: TextStyle(color: AppColors.muted)),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text(
+            context.l10n.dotSeparator.trim(),
+            style: TextStyle(color: context.colors.muted),
+          ),
         ),
         Text(b.abbreviation, style: style),
       ],
@@ -438,34 +382,41 @@ class _Legend extends StatelessWidget {
 }
 
 class _FactorTile extends StatelessWidget {
-  const _FactorTile({required this.factor});
+  const _FactorTile({required this.factor, required this.a, required this.b});
 
   final MatchupFactor factor;
+  final Team a;
+  final Team b;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final favors = factor.favors;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 18),
       title: Text(
-        factor.title,
+        l10n.factorName(factor),
         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
       ),
       subtitle: Text(
-        factor.detail,
-        style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+        l10n.factorDetail(factor, a, b),
+        style: TextStyle(color: context.colors.muted, fontSize: 12.5),
       ),
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: ShapeDecoration(
-          color: favors == null ? AppColors.surfaceHigh : AppColors.accent,
+          color: favors == null
+              ? context.colors.surfaceHigh
+              : context.colors.accent,
           shape: const StadiumBorder(),
         ),
         child: Text(
-          favors?.abbreviation ?? 'EVEN',
+          favors?.abbreviation ?? l10n.factorEven,
           style: TextStyle(
-            color: favors == null ? AppColors.muted : AppColors.onAccent,
+            color: favors == null
+                ? context.colors.muted
+                : context.colors.onAccent,
             fontWeight: FontWeight.w800,
             fontSize: 12,
           ),
@@ -475,14 +426,134 @@ class _FactorTile extends StatelessWidget {
   }
 }
 
+/// Last few results for each team as W/L chips.
+class _RecentFormCard extends StatelessWidget {
+  const _RecentFormCard({required this.teams});
+
+  final List<Team> teams;
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = StatsScope.of(context);
+    return StatCard(
+      child: Column(
+        children: [
+          for (final team in teams)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  TeamBadge(team: team, size: 40),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      team.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  FormStrip(
+                    teamId: team.id,
+                    games: repo.recentGames(team.id, limit: _recentGameCount),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Questionable / out players for each team.
+class _InjuryReportCard extends StatelessWidget {
+  const _InjuryReportCard({required this.teams});
+
+  final List<Team> teams;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final repo = StatsScope.of(context);
+    return StatCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (index, team) in teams.indexed) ...[
+            if (index > 0) ...[
+              const SizedBox(height: 6),
+              const Divider(),
+              const SizedBox(height: 10),
+            ],
+            Row(
+              children: [
+                TeamBadge(team: team, size: 28),
+                const SizedBox(width: 8),
+                Text(
+                  team.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (repo.injuryReport(team.id) case final injuries
+                when injuries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(
+                  l10n.noPlayersListed,
+                  style: TextStyle(color: context.colors.muted),
+                ),
+              )
+            else
+              for (final p in repo.injuryReport(team.id))
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: '${p.position}  ',
+                                style: TextStyle(
+                                  color: context.colors.muted,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextSpan(text: p.fullName),
+                              if (p.injuryNote != null)
+                                TextSpan(
+                                  text: '${l10n.dotSeparator}${p.injuryNote}',
+                                  style: TextStyle(color: context.colors.muted),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      PlayerStatusChip(status: p.status, compact: true),
+                    ],
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 enum _RecentMetric {
-  scored('Points scored / game'),
-  allowed('Points allowed / game'),
-  margin('Scoring margin / game');
+  scored('recentScored'),
+  allowed('recentAllowed'),
+  margin('recentMargin');
 
-  const _RecentMetric(this.label);
+  const _RecentMetric(this.labelKey);
 
-  final String label;
+  final String labelKey;
 }
 
 /// Compares each team's averages over its most recent completed games.
@@ -499,7 +570,7 @@ class _RecentComparison extends StatelessWidget {
   final List<GameStats> gamesA;
   final List<GameStats> gamesB;
 
-  /// The five most recent completed games with a final score.
+  /// The most recent completed games with a final score.
   List<GameStats> _completedGames(List<GameStats> games) {
     final completed =
         games
@@ -511,7 +582,7 @@ class _RecentComparison extends StatelessWidget {
             )
             .toList()
           ..sort((x, y) => y.startTime.compareTo(x.startTime));
-    return completed.take(5).toList();
+    return completed.take(_recentGameCount).toList();
   }
 
   /// A team's per-game average for [metric], or null with no games.
@@ -535,21 +606,24 @@ class _RecentComparison extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final recentA = _completedGames(gamesA);
     final recentB = _completedGames(gamesB);
 
     if (recentA.isEmpty && recentB.isEmpty) {
       return Text(
-        'No completed games available for these teams.',
-        style: TextStyle(color: AppColors.muted),
+        l10n.noCompletedGames,
+        style: TextStyle(color: context.colors.muted),
       );
     }
 
     final headStyle = TextStyle(
-      color: AppColors.text,
+      color: context.colors.text,
       fontWeight: FontWeight.w800,
       letterSpacing: 0.3,
     );
+    final colorA = teamColor(context, a);
+    final colorB = teamColor(context, b);
 
     return Column(
       children: [
@@ -569,21 +643,25 @@ class _RecentComparison extends StatelessWidget {
           StatCompareRow(
             def: StatDef(
               'recent_${metric.name}',
-              metric.label,
+              metric.labelKey,
               decimals: 1,
               higherIsBetter: metric != _RecentMetric.allowed,
               signed: metric == _RecentMetric.margin,
             ),
             valueA: _average(recentA, a.id, metric),
             valueB: _average(recentB, b.id, metric),
-            colorA: teamColor(a),
-            colorB: teamColor(b),
+            colorA: colorA,
+            colorB: colorB,
           ),
         const SizedBox(height: 8),
         Text(
-          '${a.abbreviation}: ${recentA.length} games · '
-          '${b.abbreviation}: ${recentB.length} games',
-          style: TextStyle(color: AppColors.muted, fontSize: 12),
+          l10n.recentGamesCount(
+            a.abbreviation,
+            recentA.length,
+            b.abbreviation,
+            recentB.length,
+          ),
+          style: TextStyle(color: context.colors.muted, fontSize: 12),
         ),
       ],
     );

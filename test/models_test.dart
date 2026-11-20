@@ -71,10 +71,7 @@ void main() {
     test('names a winner only when the game is final', () {
       expect(game.winnerTeamId, 'lakers');
       expect(game.lineForPlayer('lebron')?.stats['pts'], 28);
-      expect(
-        game.copyWith(status: GameStatus.scheduled).winnerTeamId,
-        isNull,
-      );
+      expect(game.copyWith(status: GameStatus.scheduled).winnerTeamId, isNull);
     });
 
     test('round-trips through JSON', () {
@@ -91,5 +88,4 @@ void main() {
     expect(repo.findTeamById('missing-team'), isNull);
     expect(() => repo.teamById('missing-team'), throwsStateError);
   });
-
 }

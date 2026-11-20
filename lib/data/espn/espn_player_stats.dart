@@ -24,11 +24,21 @@ class EspnPlayerStatsSource implements PlayerStatsSource {
     required Map<League, int> seasonYears,
     Duration timeout = const Duration(seconds: 20),
     Duration retryDelay = const Duration(milliseconds: 400),
-  })  : _http = EspnHttp(client, timeout: timeout, retryDelay: retryDelay),
-        _seasonYears = Map.unmodifiable(seasonYears);
+    this.ownsClient = false,
+  }) : _http = EspnHttp(client, timeout: timeout, retryDelay: retryDelay),
+       _seasonYears = Map.unmodifiable(seasonYears);
 
   final EspnHttp _http;
   final Map<League, int> _seasonYears;
+
+  /// Whether [close] should close the HTTP client. False when the client was
+  /// injected (tests own and close their own clients).
+  final bool ownsClient;
+
+  /// Releases the HTTP client if this source created it.
+  void close() {
+    if (ownsClient) _http.client.close();
+  }
 
   @override
   bool supports(Player player) {
@@ -44,7 +54,8 @@ class EspnPlayerStatsSource implements PlayerStatsSource {
     if (league == null || year == null || athleteId == null) {
       throw ArgumentError.value(player.id, 'player', 'not a live ESPN player');
     }
-    final url = '${league.coreBase}/seasons/$year/types/'
+    final url =
+        '${league.coreBase}/seasons/$year/types/'
         '${league.regularSeasonType}/athletes/$athleteId/statistics';
     try {
       return league.playerStats(parseEspnStats(await _http.getJson(url)));

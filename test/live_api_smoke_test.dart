@@ -1,9 +1,16 @@
+/// Hits the real ESPN APIs. Slow and network-dependent by design: it is the
+/// check that the live feeds still have the shape the parsers expect.
+///
+/// Tagged `live`, which dart_test.yaml skips by default so CI and everyday
+/// runs stay offline. Run it with:
+///   flutter test --run-skipped --tags live
+@Tags(['live'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:statmyteam/data/stats_repository.dart';
 import 'package:statmyteam/models/models.dart';
 
-/// Hits the real ESPN APIs. Slow and network-dependent by design: it is the
-/// check that the live feeds still have the shape the parsers expect.
 void main() {
   late StatsRepository repo;
 
@@ -51,8 +58,11 @@ void main() {
     test('${league.label} player stats load on demand', () async {
       final team = repo.teams.firstWhere((t) => t.league == league);
       // Starters are the most likely to have played this season.
-      final starters =
-          repo.rosterFor(team.id).where((p) => p.isStarter).take(6).toList();
+      final starters = repo
+          .rosterFor(team.id)
+          .where((p) => p.isStarter)
+          .take(6)
+          .toList();
       final loaded = await Future.wait(starters.map(repo.withSeasonStats));
       expect(
         loaded.any((p) => p.seasonStats.containsKey('gp')),

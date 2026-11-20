@@ -1,6 +1,36 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
+
+/// Runs a preference write such as toggling a favorite, and tells the user
+/// with a SnackBar if it fails (the store keeps its previous state).
+/// Returns whether the write succeeded. Only [Exception]s are handled;
+/// programming errors still propagate.
+Future<bool> saveWithFeedback(
+  BuildContext context,
+  Future<void> Function() save, {
+  String? failureMessage,
+}) async {
+  // Read everything from context up front: it may be unmounted after await.
+  final messenger = ScaffoldMessenger.of(context);
+  final message = failureMessage ?? context.l10n.saveFailed;
+  try {
+    await save();
+    return true;
+  } on Exception catch (error, stack) {
+    developer.log(
+      'Preference save failed',
+      name: 'Preferences',
+      error: error,
+      stackTrace: stack,
+    );
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+    return false;
+  }
+}
 
 /// Pill-style top bar: a title (or back + title) pill on the left, and an
 /// optional info pill plus round action buttons on the right.
@@ -61,7 +91,7 @@ class PillAppBar extends StatelessWidget implements PreferredSizeWidget {
                         children: [
                           if (canPop)
                             IconButton(
-                              tooltip: 'Back',
+                              tooltip: context.l10n.back,
                               onPressed: () => Navigator.of(context).maybePop(),
                               icon: const Icon(Icons.chevron_left, size: 28),
                             ),
@@ -116,8 +146,8 @@ class _Pill extends StatelessWidget {
       height: 56,
       padding: padding,
       decoration: ShapeDecoration(
-        color: AppColors.surface,
-        shape: StadiumBorder(),
+        color: context.colors.surface,
+        shape: const StadiumBorder(),
       ),
       child: Align(widthFactor: 1, child: child),
     );
@@ -153,10 +183,10 @@ class RoundIconButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final double size;
 
-  /// Defaults to [AppColors.surface].
+  /// Defaults to [context.colors.surface].
   final Color? color;
 
-  /// Defaults to [AppColors.ink].
+  /// Defaults to [context.colors.ink].
   final Color? iconColor;
   final bool outlined;
 
@@ -167,13 +197,13 @@ class RoundIconButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, size: size * 0.46),
       style: IconButton.styleFrom(
-        backgroundColor: color ?? AppColors.surface,
-        foregroundColor: iconColor ?? AppColors.ink,
+        backgroundColor: color ?? context.colors.surface,
+        foregroundColor: iconColor ?? context.colors.ink,
         fixedSize: Size.square(size),
         minimumSize: Size.square(size),
         shape: CircleBorder(
           side: outlined
-              ? BorderSide(color: AppColors.border)
+              ? BorderSide(color: context.colors.border)
               : BorderSide.none,
         ),
       ),
@@ -208,31 +238,46 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: ShapeDecoration(
-        color: AppColors.nav,
-        shape: const StadiumBorder(),
-        shadows: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(width: 6),
-            _NavButton(
-              item: items[i],
-              selected: i == index,
-              onTap: () => onSelect(i),
+    // The pills have a fixed height, so cap very large text there; the
+    // selected label also shrinks with an ellipsis rather than overflowing
+    // a narrow screen.
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.6,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: ShapeDecoration(
+          color: context.colors.nav,
+          shape: const StadiumBorder(),
+          shadows: [
+            BoxShadow(
+              color: context.colors.shadow,
+              blurRadius: 20,
+              offset: const Offset(0, 6),
             ),
           ],
-        ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < items.length; i++) ...[
+              if (i > 0) const SizedBox(width: 6),
+              if (i == index)
+                Flexible(
+                  child: _NavButton(
+                    item: items[i],
+                    selected: true,
+                    onTap: () => onSelect(i),
+                  ),
+                )
+              else
+                _NavButton(
+                  item: items[i],
+                  selected: false,
+                  onTap: () => onSelect(i),
+                ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -259,7 +304,7 @@ class _NavButton extends StatelessWidget {
       child: Tooltip(
         message: selected ? '' : item.label,
         child: Material(
-          color: selected ? AppColors.navSelected : AppColors.navItem,
+          color: selected ? context.colors.navSelected : context.colors.navItem,
           shape: const StadiumBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -278,17 +323,22 @@ class _NavButton extends StatelessWidget {
                         item.icon,
                         size: 24,
                         color: selected
-                            ? AppColors.navSelectedFg
+                            ? context.colors.navSelectedFg
                             : Colors.white.withValues(alpha: 0.6),
                       ),
                       if (selected) ...[
                         const SizedBox(width: 10),
-                        Text(
-                          item.label,
-                          style: TextStyle(
-                            color: AppColors.navSelectedFg,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              color: context.colors.navSelectedFg,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],

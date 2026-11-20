@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show compute;
 import 'package:http/http.dart' as http;
 
 import '../logic/football_stats.dart';
+import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import 'basketball_data.dart';
 import 'espn/espn_http.dart';
@@ -12,9 +13,11 @@ import 'espn/espn_league_api.dart';
 import 'espn/espn_leagues.dart';
 import 'espn/espn_player_stats.dart';
 import 'football_data.dart';
+import 'load_status.dart';
 import 'soccer_data.dart';
 
 export 'espn/espn_player_stats.dart' show PlayerStatsSource;
+export 'load_status.dart';
 
 typedef _LeagueSet = ({
   List<Team> teams,
@@ -26,28 +29,42 @@ typedef _LeagueSet = ({
 ///
 /// Use [live] for real data from ESPN; [sampleFootball] stays available for
 /// offline / widget tests.
+///
+/// The data is immutable, so lookups are indexed and derived lists (rosters,
+/// conferences, peers) are computed once and cached; build methods can call
+/// them freely.
 class StatsRepository {
   StatsRepository({
     required List<Team> teams,
     required List<Player> players,
     required List<GameStats> games,
     Set<League> liveLeagues = const {},
-    Map<League, String> loadErrors = const {},
-    Map<League, String> loadWarnings = const {},
+    Map<League, LoadFailure> loadErrors = const {},
+    Map<League, List<FeedGap>> loadWarnings = const {},
     List<Team> opponents = const [],
     PlayerStatsSource? playerStats,
     this.clock = DateTime.now,
-  })  : teams = List.unmodifiable(teams),
-        players = List.unmodifiable(players),
-        games = List.unmodifiable(
-          List<GameStats>.of(games)
-            ..sort((a, b) => b.startTime.compareTo(a.startTime)),
-        ),
-        liveLeagues = Set.unmodifiable(liveLeagues),
-        loadErrors = Map.unmodifiable(loadErrors),
-        loadWarnings = Map.unmodifiable(loadWarnings),
-        _opponents = {for (final t in opponents) t.id: t},
-        _statsSource = playerStats;
+  }) : teams = List.unmodifiable(teams),
+       players = List.unmodifiable(players),
+       games = List.unmodifiable(
+         List<GameStats>.of(games)
+           ..sort((a, b) => b.startTime.compareTo(a.startTime)),
+       ),
+       liveLeagues = Set.unmodifiable(liveLeagues),
+       loadErrors = Map.unmodifiable(loadErrors),
+       loadWarnings = Map.unmodifiable({
+         for (final MapEntry(:key, :value) in loadWarnings.entries)
+           key: List<FeedGap>.unmodifiable(value),
+       }),
+       _opponents = {for (final t in opponents) t.id: t},
+       _statsSource = playerStats {
+    for (final team in this.teams) {
+      _teamsById[team.id] = team;
+    }
+    for (final player in this.players) {
+      _playersByTeam.putIfAbsent(player.teamId, () => []).add(player);
+    }
+  }
 
   /// Fictional NFL, NCAA, NBA, and MLS sample leagues.
   factory StatsRepository.sampleFootball() {
@@ -67,28 +84,28 @@ class StatsRepository {
   ];
 
   static _LeagueSet _sample(League league) => switch (league) {
-        League.nfl => (
-            teams: footballTeams,
-            players: footballPlayers,
-            games: footballGames,
-          ),
-        League.ncaa => (
-            teams: collegeTeams,
-            players: collegePlayers,
-            games: collegeGames,
-          ),
-        League.nba => (
-            teams: basketballTeams,
-            players: basketballPlayers,
-            games: basketballGames,
-          ),
-        League.mls => (
-            teams: soccerTeams,
-            players: soccerPlayers,
-            games: soccerGames,
-          ),
-        _ => (teams: const [], players: const [], games: const []),
-      };
+    League.nfl => (
+      teams: footballTeams,
+      players: footballPlayers,
+      games: footballGames,
+    ),
+    League.ncaa => (
+      teams: collegeTeams,
+      players: collegePlayers,
+      games: collegeGames,
+    ),
+    League.nba => (
+      teams: basketballTeams,
+      players: basketballPlayers,
+      games: basketballGames,
+    ),
+    League.mls => (
+      teams: soccerTeams,
+      players: soccerPlayers,
+      games: soccerGames,
+    ),
+    _ => (teams: const [], players: const [], games: const []),
+  };
 
   /// Live NFL, college football (FBS), NBA, and MLS data from ESPN.
   ///
@@ -125,8 +142,8 @@ class StatsRepository {
     final games = <GameStats>[];
     final opponents = <Team>[];
     final live = <League>{};
-    final errors = <League, String>{};
-    final warnings = <League, String>{};
+    final errors = <League, LoadFailure>{};
+    final warnings = <League, List<FeedGap>>{};
     final seasonYears = <League, int>{};
 
     for (final (index, league) in leagues.indexed) {
@@ -139,15 +156,14 @@ class StatsRepository {
         live.add(league.league);
         seasonYears[league.league] = data.seasonYear;
         if (data.warnings.isNotEmpty) {
-          warnings[league.league] =
-              'Some data failed to load: ${data.warnings.join(', ')}.';
+          warnings[league.league] = data.warnings;
         }
       } else {
         final sample = _sample(league.league);
         teams.addAll(sample.teams);
         players.addAll(sample.players);
         games.addAll(sample.games);
-        errors[league.league] = result.error ?? 'Unknown error';
+        errors[league.league] = result.error!;
       }
     }
 
@@ -159,11 +175,12 @@ class StatsRepository {
       liveLeagues: live,
       loadErrors: errors,
       loadWarnings: warnings,
-      // The client stays open for on-demand player stats for the app's life.
+      // The client stays open for on-demand player stats until [close].
       playerStats: live.isEmpty
           ? null
           : EspnPlayerStatsSource(
               client: client ?? http.Client(),
+              ownsClient: client == null,
               seasonYears: seasonYears,
               retryDelay: retryDelay,
             ),
@@ -189,7 +206,7 @@ class StatsRepository {
       error is http.ClientException ||
       error is FormatException;
 
-  static Future<({EspnLeagueData? data, String? error})> _loadLeague(
+  static Future<({EspnLeagueData? data, LoadFailure? error})> _loadLeague(
     EspnLeague league,
     http.Client? client, {
     required Duration timeout,
@@ -201,8 +218,11 @@ class StatsRepository {
       // parse in parallel. An injected client (tests) can't cross isolates.
       final load = client == null
           ? compute(_fetchLeagueInBackground, league)
-          : EspnLeagueApi(league, client: client, retryDelay: retryDelay)
-              .fetchLeague();
+          : EspnLeagueApi(
+              league,
+              client: client,
+              retryDelay: retryDelay,
+            ).fetchLeague();
       // One slow league must not hold the whole app on the loading screen.
       final data = await load.timeout(
         timeout,
@@ -221,7 +241,7 @@ class StatsRepository {
         error: error,
         stackTrace: stack,
       );
-      return (data: null, error: '$error');
+      return (data: null, error: LoadFailure.from(error));
     }
   }
 
@@ -232,11 +252,12 @@ class StatsRepository {
   final Set<League> liveLeagues;
 
   /// Leagues whose live load failed (and now show sample data), with why.
-  final Map<League, String> loadErrors;
+  /// Show [LoadFailure.kind] to users; [LoadFailure.detail] is for logs.
+  final Map<League, LoadFailure> loadErrors;
 
   /// Live leagues where part of the feed failed (some rosters, team stats,
   /// or schedules are missing), with what failed.
-  final Map<League, String> loadWarnings;
+  final Map<League, List<FeedGap>> loadWarnings;
 
   /// Newest first.
   final List<GameStats> games;
@@ -249,6 +270,14 @@ class StatsRepository {
 
   /// Time source for [emptyStatsTtl]; injectable for tests.
   final DateTime Function() clock;
+
+  final Map<String, Team> _teamsById = {};
+  final Map<String, List<Player>> _playersByTeam = {};
+  final Map<String, List<Player>> _rosterCache = {};
+  final Map<(League, Sport?), Map<String?, List<Team>>> _conferenceCache = {};
+  final Map<(Sport, League?), List<Team>> _peersCache = {};
+  final Map<String, TeamOutlook> _outlookCache = {};
+  final Map<String, List<RosterSection>> _sectionCache = {};
 
   final Map<String, Future<Player>> _statsRequests = {};
   final Map<String, Player> _statsLoaded = {};
@@ -263,9 +292,14 @@ class StatsRepository {
 
   /// Leagues that have teams but are showing sample data.
   List<League> get sampleLeagues => [
-        for (final league in leagues)
-          if (!liveLeagues.contains(league)) league,
-      ];
+    for (final league in leagues)
+      if (!liveLeagues.contains(league)) league,
+  ];
+
+  /// Releases the HTTP client used for on-demand player stats.
+  void close() {
+    if (_statsSource case final EspnPlayerStatsSource source) source.close();
+  }
 
   /// [player] with season stats, if they are already available.
   Player? loadedSeasonStats(Player player) {
@@ -302,18 +336,16 @@ class StatsRepository {
         }
         return _statsLoaded[player.id] = player.copyWith(seasonStats: stats);
       } finally {
-        _statsRequests.remove(player.id);
+        // The removed entry is this very future, so there is nothing to
+        // await here.
+        final _ = _statsRequests.remove(player.id);
       }
     });
   }
 
   /// Returns the team for [id], or `null` when it is not in the dataset.
-  Team? findTeamById(String id) {
-    for (final team in teams) {
-      if (team.id == id) return team;
-    }
-    return _opponents[id];
-  }
+  /// Prefer this in UI code: ids come from external feeds.
+  Team? findTeamById(String id) => _teamsById[id] ?? _opponents[id];
 
   /// Same as [findTeamById], but throws a clear [StateError] when missing.
   Team teamById(String id) {
@@ -326,100 +358,148 @@ class StatsRepository {
 
   /// Sports that have at least one team, in [Sport] order.
   List<Sport> get sports => [
-        for (final sport in Sport.values)
-          if (teams.any((t) => t.sport == sport)) sport,
-      ];
+    for (final sport in Sport.values)
+      if (teams.any((t) => t.sport == sport)) sport,
+  ];
 
   /// Leagues that have at least one team, in [League] order.
   List<League> get leagues => leaguesFor();
 
   /// Leagues that have at least one team, optionally limited to [sport].
   List<League> leaguesFor([Sport? sport]) => [
-        for (final league in League.values)
-          if (teams.any(
-            (t) => t.league == league && (sport == null || t.sport == sport),
-          ))
-            league,
-      ];
+    for (final league in League.values)
+      if (teams.any(
+        (t) => t.league == league && (sport == null || t.sport == sport),
+      ))
+        league,
+  ];
 
   /// Same-league clubs used to grade strengths and weaknesses.
-  List<Team> peersOf(Team team) => [
-        for (final peer in teams)
-          if (peer.sport == team.sport && peer.league == team.league) peer,
-      ];
+  List<Team> peersOf(Team team) =>
+      _peersCache.putIfAbsent((team.sport, team.league), () {
+        return List.unmodifiable([
+          for (final peer in teams)
+            if (peer.sport == team.sport && peer.league == team.league) peer,
+        ]);
+      });
 
-  /// Conference name → teams in [league], best record first.
-  Map<String, List<Team>> teamsByConference(League league, {Sport? sport}) {
-    final map = <String, List<Team>>{};
-    for (final team in teams.where(
-      (t) => t.league == league && (sport == null || t.sport == sport),
-    )) {
-      map.putIfAbsent(team.conference ?? 'Independent', () => []).add(team);
-    }
-    for (final list in map.values) {
-      list.sort((a, b) => b.winPercentage.compareTo(a.winPercentage));
-    }
-    return map;
-  }
+  /// [team]'s strengths and weaknesses versus its league, computed once.
+  TeamOutlook outlookFor(Team team) => _outlookCache.putIfAbsent(
+    team.id,
+    () => TeamOutlook.analyze(team, peersOf(team)),
+  );
+
+  /// Conference name → teams in [league], best record first. Teams without
+  /// a conference are listed under the `null` key.
+  Map<String?, List<Team>> teamsByConference(League league, {Sport? sport}) =>
+      _conferenceCache.putIfAbsent((league, sport), () {
+        final map = <String?, List<Team>>{};
+        for (final team in teams.where(
+          (t) => t.league == league && (sport == null || t.sport == sport),
+        )) {
+          map.putIfAbsent(team.conference, () => []).add(team);
+        }
+        return Map.unmodifiable({
+          for (final MapEntry(:key, :value) in map.entries)
+            key: List<Team>.unmodifiable(
+              value..sort((a, b) => b.winPercentage.compareTo(a.winPercentage)),
+            ),
+        });
+      });
 
   /// Roster ordered by position group, then starters before backups.
-  List<Player> rosterFor(String teamId) {
-    final roster = players.where((p) => p.teamId == teamId).toList();
+  List<Player> rosterFor(String teamId) => _rosterCache.putIfAbsent(teamId, () {
+    final roster = List<Player>.of(_playersByTeam[teamId] ?? const []);
     roster.sort((a, b) {
       final group = PositionGroup.of(a.position).index
           .compareTo(PositionGroup.of(b.position).index);
       if (group != 0) return group;
       return (a.role?.index ?? 9).compareTo(b.role?.index ?? 9);
     });
-    return roster;
-  }
+    return List.unmodifiable(roster);
+  });
 
+  /// Players whose position falls in [group]. Unlisted football codes
+  /// count as special teams, matching [PositionGroup.of] and [rosterFor].
   List<Player> rosterInGroup(String teamId, PositionGroup group) => [
-        for (final p in rosterFor(teamId))
-          if (group.positions.contains(p.position)) p,
-      ];
+    for (final p in rosterFor(teamId))
+      if (PositionGroup.of(p.position) == group) p,
+  ];
+
+  /// Roster split into display sections, computed once per team: position
+  /// groups for football (every player lands in one), positions elsewhere.
+  List<RosterSection> rosterSections(Team team) =>
+      _sectionCache.putIfAbsent(team.id, () {
+        final roster = rosterFor(team.id);
+        if (team.sport == Sport.football) {
+          return List.unmodifiable([
+            for (final group in PositionGroup.values)
+              if ([
+                    for (final p in roster)
+                      if (PositionGroup.of(p.position) == group) p,
+                  ]
+                  case final players when players.isNotEmpty)
+                RosterSection(group: group, players: players),
+          ]);
+        }
+        final byPosition = <String, List<Player>>{};
+        for (final p in roster) {
+          byPosition.putIfAbsent(p.position, () => []).add(p);
+        }
+        return List.unmodifiable([
+          for (final MapEntry(:key, :value) in byPosition.entries)
+            RosterSection(position: key, players: List.unmodifiable(value)),
+        ]);
+      });
 
   /// Players listed as questionable, out, or on injured reserve.
   List<Player> injuryReport(String teamId) => [
-        for (final p in rosterFor(teamId))
-          if (p.status != PlayerStatus.active) p,
-      ];
+    for (final p in rosterFor(teamId))
+      if (p.status != PlayerStatus.active) p,
+  ];
 
   /// Most recent completed games for a team, newest first.
   List<GameStats> recentGames(String teamId, {int limit = 5}) => games
-      .where((g) =>
-          g.isFinal && (g.homeTeamId == teamId || g.awayTeamId == teamId))
+      .where(
+        (g) => g.isFinal && (g.homeTeamId == teamId || g.awayTeamId == teamId),
+      )
       .take(limit)
       .toList();
 
   /// Completed meetings between two teams, newest first.
   List<GameStats> headToHead(String a, String b) => games
-      .where((g) =>
-          g.isFinal &&
-          ((g.homeTeamId == a && g.awayTeamId == b) ||
-              (g.homeTeamId == b && g.awayTeamId == a)))
+      .where(
+        (g) =>
+            g.isFinal &&
+            ((g.homeTeamId == a && g.awayTeamId == b) ||
+                (g.homeTeamId == b && g.awayTeamId == a)),
+      )
       .toList();
 
   /// Scheduled games that have not started yet, earliest first.
-  List<GameStats> upcomingGames({
-    Sport? sport,
-    League? league,
-    DateTime? now,
-  }) {
+  List<GameStats> upcomingGames({Sport? sport, League? league, DateTime? now}) {
     final cutoff = (now ?? DateTime.now()).toUtc();
-    final teamsById = {for (final team in teams) team.id: team};
     final upcoming = games.where((game) {
       if (game.status != GameStatus.scheduled ||
           !game.startTime.isAfter(cutoff) ||
           (sport != null && game.sport != sport)) {
         return false;
       }
-      final home = teamsById[game.homeTeamId];
-      final away = teamsById[game.awayTeamId];
+      final home = _teamsById[game.homeTeamId];
+      final away = _teamsById[game.awayTeamId];
       if (home == null || away == null) return false;
       return league == null || (home.league == league && away.league == league);
-    }).toList()
-      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    }).toList()..sort((a, b) => a.startTime.compareTo(b.startTime));
     return upcoming;
   }
+}
+
+/// One heading on a team roster: a football [group], or a single [position]
+/// code for other sports.
+class RosterSection {
+  const RosterSection({this.group, this.position, required this.players});
+
+  final PositionGroup? group;
+  final String? position;
+  final List<Player> players;
 }

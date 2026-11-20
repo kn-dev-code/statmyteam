@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 
 import '../data/stats_repository.dart';
+import '../l10n/l10n.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -59,18 +60,18 @@ class _PlayerStatsLoaderState extends State<PlayerStatsLoader> {
     }
     _ready = null;
     final ids = [for (final p in widget.players) p.id];
-    _pending = Future.wait([
-      for (final p in widget.players) repo.withSeasonStats(p),
-    ]).catchError((Object error, StackTrace stack) {
-      developer.log(
-        'Season stats failed for $ids',
-        name: 'PlayerStatsLoader',
-        error: error,
-        stackTrace: stack,
-      );
-      // Rethrow so the FutureBuilder shows the error state with Retry.
-      Error.throwWithStackTrace(error, stack);
-    });
+    _pending =
+        Future.wait([for (final p in widget.players) repo.withSeasonStats(p)])
+            .catchError((Object error, StackTrace stack) {
+              developer.log(
+                'Season stats failed for $ids',
+                name: 'PlayerStatsLoader',
+                error: error,
+                stackTrace: stack,
+              );
+              // Rethrow so the FutureBuilder shows the error state with Retry.
+              Error.throwWithStackTrace(error, stack);
+            });
   }
 
   /// Same player objects in the same order (an updated [Player] with the
@@ -101,12 +102,16 @@ class _PlayerStatsLoaderState extends State<PlayerStatsLoader> {
           return StatCard(
             child: Row(
               children: [
-                Icon(Icons.cloud_off_rounded, color: AppColors.gold, size: 20),
+                Icon(
+                  Icons.cloud_off_rounded,
+                  color: context.colors.gold,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
-                const Expanded(child: Text('Could not load season stats.')),
+                Expanded(child: Text(context.l10n.couldNotLoadSeasonStats)),
                 TextButton(
                   onPressed: () => setState(_load),
-                  child: const Text('Retry'),
+                  child: Text(context.l10n.retry),
                 ),
               ],
             ),
@@ -121,8 +126,8 @@ class _PlayerStatsLoaderState extends State<PlayerStatsLoader> {
               ),
               const SizedBox(width: 12),
               Text(
-                'Loading season stats…',
-                style: TextStyle(color: AppColors.muted),
+                context.l10n.loadingSeasonStats,
+                style: TextStyle(color: context.colors.muted),
               ),
             ],
           ),

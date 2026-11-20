@@ -1,10 +1,15 @@
 import '../models/models.dart';
 
-/// How a stat is labelled, formatted, and which direction is "better".
+/// How a stat is formatted and which direction is "better". Values are
+/// displayed with `AppLocalizations.statValue`, which formats them for the
+/// current locale.
+///
+/// [labelKey] names the stat's display label; the UI resolves it through
+/// localization (`AppLocalizations.statLabel`). Unknown keys display as-is.
 class StatDef {
   const StatDef(
     this.key,
-    this.label, {
+    this.labelKey, {
     this.decimals = 0,
     this.isPercent = false,
     this.higherIsBetter = true,
@@ -12,7 +17,7 @@ class StatDef {
   });
 
   final String key;
-  final String label;
+  final String labelKey;
   final int decimals;
 
   /// Stored as 0–1, shown as a percentage.
@@ -21,41 +26,34 @@ class StatDef {
 
   /// Show a leading `+` on positive values (e.g. turnover differential).
   final bool signed;
-
-  String format(double value) {
-    if (isPercent) return '${(value * 100).toStringAsFixed(decimals)}%';
-    final text = value.toStringAsFixed(decimals);
-    return signed && value > 0 ? '+$text' : text;
-  }
 }
 
 /// Position groupings used for roster sections and player comparison.
+/// Display names come from localization (`positionGroupName`).
 enum PositionGroup {
-  quarterback('QB', 'Quarterbacks', {'QB'}),
-  runningBack('RB', 'Running backs', {'RB', 'FB'}),
-  receiver('WR / TE', 'Receivers', {'WR', 'TE'}),
-  offensiveLine('OL', 'Offensive line', {'OL'}),
-  frontSeven('Front 7', 'Front seven', {'DE', 'DT', 'DL', 'LB'}),
-  secondary('DB', 'Secondary', {'CB', 'S', 'DB'}),
-  specialTeams('K', 'Special teams', {'K', 'P', 'LS'});
+  quarterback({'QB'}),
+  runningBack({'RB', 'FB'}),
+  receiver({'WR', 'TE'}),
+  offensiveLine({'OL'}),
+  frontSeven({'DE', 'DT', 'DL', 'LB'}),
+  secondary({'CB', 'S', 'DB'}),
+  specialTeams({'K', 'P', 'LS'});
 
-  const PositionGroup(this.shortLabel, this.label, this.positions);
+  const PositionGroup(this.positions);
 
-  final String shortLabel;
-  final String label;
   final Set<String> positions;
 
   /// Groups with stats worth comparing. Offensive linemen are listed on
   /// rosters, but no per-player stats are published for them.
   static List<PositionGroup> get comparable => [
-        for (final group in values)
-          if (group != offensiveLine) group,
-      ];
+    for (final group in values)
+      if (group != offensiveLine) group,
+  ];
 
   static PositionGroup of(String position) => PositionGroup.values.firstWhere(
-        (group) => group.positions.contains(position),
-        orElse: () => PositionGroup.specialTeams,
-      );
+    (group) => group.positions.contains(position),
+    orElse: () => PositionGroup.specialTeams,
+  );
 }
 
 class FootballStats {
@@ -63,57 +61,74 @@ class FootballStats {
 
   /// Team-level season stats, in display order.
   static const teamStats = <StatDef>[
-    StatDef('ppg', 'Points / game', decimals: 1),
-    StatDef('papg', 'Points allowed / game', decimals: 1, higherIsBetter: false),
-    StatDef('ypg', 'Yards / game', decimals: 1),
-    StatDef('passYpg', 'Pass yards / game', decimals: 1),
-    StatDef('rushYpg', 'Rush yards / game', decimals: 1),
-    StatDef('yapg', 'Yards allowed / game', decimals: 1, higherIsBetter: false),
-    StatDef('toDiff', 'Turnover differential', signed: true),
-    StatDef('sacks', 'Sacks'),
-    StatDef('thirdPct', '3rd-down conversion', decimals: 1, isPercent: true),
-    StatDef('redZonePct', 'Red-zone TD rate', decimals: 1, isPercent: true),
+    StatDef('ppg', 'pointsPerGame', decimals: 1),
+    StatDef('papg', 'pointsAllowedPerGame', decimals: 1, higherIsBetter: false),
+    StatDef('ypg', 'yardsPerGame', decimals: 1),
+    StatDef('passYpg', 'passYardsPerGame', decimals: 1),
+    StatDef('rushYpg', 'rushYardsPerGame', decimals: 1),
+    StatDef('yapg', 'yardsAllowedPerGame', decimals: 1, higherIsBetter: false),
+    StatDef('toDiff', 'turnoverDifferential', signed: true),
+    StatDef('sacks', 'sacks'),
+    StatDef('thirdPct', 'thirdDownConversion', decimals: 1, isPercent: true),
+    StatDef('redZonePct', 'redZoneTdRate', decimals: 1, isPercent: true),
   ];
 
   static const _playerStats = <String, StatDef>{
-    'gp': StatDef('gp', 'Games played'),
+    'gp': StatDef('gp', 'gamesPlayed'),
     // Passing
-    'compPct': StatDef('compPct', 'Completion %', decimals: 1, isPercent: true),
-    'passYds': StatDef('passYds', 'Pass yards'),
-    'passTd': StatDef('passTd', 'Pass TD'),
-    'intThrown':
-        StatDef('intThrown', 'Interceptions thrown', higherIsBetter: false),
-    'rating': StatDef('rating', 'Passer rating', decimals: 1),
+    'compPct': StatDef(
+      'compPct',
+      'completionPct',
+      decimals: 1,
+      isPercent: true,
+    ),
+    'passYds': StatDef('passYds', 'passYards'),
+    'passTd': StatDef('passTd', 'passTd'),
+    'intThrown': StatDef(
+      'intThrown',
+      'interceptionsThrown',
+      higherIsBetter: false,
+    ),
+    'rating': StatDef('rating', 'passerRating', decimals: 1),
     // Rushing
-    'rushAtt': StatDef('rushAtt', 'Carries'),
-    'rushYds': StatDef('rushYds', 'Rush yards'),
-    'ypc': StatDef('ypc', 'Yards / carry', decimals: 1),
-    'rushTd': StatDef('rushTd', 'Rush TD'),
-    'fum': StatDef('fum', 'Fumbles lost', higherIsBetter: false),
+    'rushAtt': StatDef('rushAtt', 'carries'),
+    'rushYds': StatDef('rushYds', 'rushYards'),
+    'ypc': StatDef('ypc', 'yardsPerCarry', decimals: 1),
+    'rushTd': StatDef('rushTd', 'rushTd'),
+    'fum': StatDef('fum', 'fumblesLost', higherIsBetter: false),
     // Receiving
-    'tgt': StatDef('tgt', 'Targets'),
-    'rec': StatDef('rec', 'Receptions'),
-    'recYds': StatDef('recYds', 'Receiving yards'),
-    'ypr': StatDef('ypr', 'Yards / catch', decimals: 1),
-    'recTd': StatDef('recTd', 'Receiving TD'),
+    'tgt': StatDef('tgt', 'targets'),
+    'rec': StatDef('rec', 'receptions'),
+    'recYds': StatDef('recYds', 'receivingYards'),
+    'ypr': StatDef('ypr', 'yardsPerCatch', decimals: 1),
+    'recTd': StatDef('recTd', 'receivingTd'),
     // Defense
-    'tkl': StatDef('tkl', 'Tackles'),
-    'sacks': StatDef('sacks', 'Sacks', decimals: 1),
-    'tfl': StatDef('tfl', 'Tackles for loss'),
-    'qbHits': StatDef('qbHits', 'QB hits'),
-    'defInt': StatDef('defInt', 'Interceptions'),
-    'pd': StatDef('pd', 'Passes defended'),
-    'ff': StatDef('ff', 'Forced fumbles'),
+    'tkl': StatDef('tkl', 'tackles'),
+    'sacks': StatDef('sacks', 'sacks', decimals: 1),
+    'tfl': StatDef('tfl', 'tacklesForLoss'),
+    'qbHits': StatDef('qbHits', 'qbHits'),
+    'defInt': StatDef('defInt', 'interceptions'),
+    'pd': StatDef('pd', 'passesDefended'),
+    'ff': StatDef('ff', 'forcedFumbles'),
     // Kicking
-    'fgm': StatDef('fgm', 'Field goals made'),
-    'fga': StatDef('fga', 'Field goals attempted'),
-    'fgPct': StatDef('fgPct', 'Field goal %', decimals: 1, isPercent: true),
-    'long': StatDef('long', 'Longest FG'),
-    'xpPct': StatDef('xpPct', 'Extra point %', decimals: 1, isPercent: true),
+    'fgm': StatDef('fgm', 'fieldGoalsMade'),
+    'fga': StatDef('fga', 'fieldGoalsAttempted'),
+    'fgPct': StatDef('fgPct', 'fieldGoalPct', decimals: 1, isPercent: true),
+    'long': StatDef('long', 'longestFg'),
+    'xpPct': StatDef('xpPct', 'extraPointPct', decimals: 1, isPercent: true),
   };
 
   static const _keysByPosition = <String, List<String>>{
-    'QB': ['gp', 'compPct', 'passYds', 'passTd', 'intThrown', 'rating', 'rushYds', 'rushTd'],
+    'QB': [
+      'gp',
+      'compPct',
+      'passYds',
+      'passTd',
+      'intThrown',
+      'rating',
+      'rushYds',
+      'rushTd',
+    ],
     'RB': ['gp', 'rushAtt', 'rushYds', 'ypc', 'rushTd', 'rec', 'recYds', 'fum'],
     'FB': ['gp', 'rushAtt', 'rushYds', 'ypc', 'rushTd', 'rec', 'recYds', 'fum'],
     'WR': ['gp', 'tgt', 'rec', 'recYds', 'ypr', 'recTd'],
@@ -133,9 +148,9 @@ class FootballStats {
 
   /// Stat lines worth showing for a player at [position].
   static List<StatDef> forPosition(String position) => [
-        for (final key in _keysByPosition[position] ?? const ['gp'])
-          playerStat(key),
-      ];
+    for (final key in _keysByPosition[position] ?? const ['gp'])
+      playerStat(key),
+  ];
 
   /// Stats shared by both players first, then anything only one of them has.
   static List<StatDef> forComparison(Player a, Player b) {
@@ -146,23 +161,4 @@ class FootballStats {
     ];
     return [for (final key in keys) playerStat(key)];
   }
-
-  static const positionNames = <String, String>{
-    'QB': 'Quarterback',
-    'RB': 'Running back',
-    'FB': 'Fullback',
-    'WR': 'Wide receiver',
-    'TE': 'Tight end',
-    'OL': 'Offensive lineman',
-    'DE': 'Defensive end',
-    'DT': 'Defensive tackle',
-    'DL': 'Defensive lineman',
-    'LB': 'Linebacker',
-    'CB': 'Cornerback',
-    'S': 'Safety',
-    'DB': 'Defensive back',
-    'K': 'Kicker',
-    'P': 'Punter',
-    'LS': 'Long snapper',
-  };
 }

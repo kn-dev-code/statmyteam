@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -17,21 +18,20 @@ class SportsSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = StatsScope.of(context);
-    final available = {
-      for (final sport in repo.sports) sport,
-    };
+    final available = {for (final sport in repo.sports) sport};
 
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: const PillAppBar(title: 'Select a sport'),
+      appBar: PillAppBar(title: l10n.selectSport),
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             Text(
               mode == TeamSelectMode.matchup
-                  ? 'Choose a sport to compare two teams.'
-                  : 'Choose a sport to browse team stats.',
-              style: TextStyle(color: AppColors.muted, fontSize: 15),
+                  ? l10n.chooseSportMatchup
+                  : l10n.chooseSportBrowse,
+              style: TextStyle(color: context.colors.muted, fontSize: 15),
             ),
             const SizedBox(height: 16),
             for (final sport in Sport.values) ...[
@@ -41,10 +41,7 @@ class SportsSelectionScreen extends StatelessWidget {
                 comingSoon: _comingSoon.contains(sport),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => TeamSelectScreen(
-                      mode: mode,
-                      sport: sport,
-                    ),
+                    builder: (_) => TeamSelectScreen(mode: mode, sport: sport),
                   ),
                 ),
               ),
@@ -79,14 +76,11 @@ class _SportCard extends StatelessWidget {
       Sport.baseball => Icons.sports_baseball,
       Sport.hockey => Icons.sports_hockey,
     };
+    final l10n = context.l10n;
+    final blurb = l10n.sportSubtitle(sport.name);
     final subtitle = comingSoon
-        ? 'Coming soon'
-        : switch (sport) {
-            Sport.football => 'NFL and college teams',
-            Sport.basketball => 'NBA clubs',
-            Sport.soccer => 'MLS clubs',
-            _ => sport.label,
-          };
+        ? l10n.comingSoon
+        : (blurb.isEmpty ? l10n.sport(sport) : blurb);
 
     return StatCard(
       padding: EdgeInsets.zero,
@@ -98,24 +92,24 @@ class _SportCard extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppColors.surfaceHigh,
+            color: context.colors.surfaceHigh,
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: AppColors.ink),
+          child: Icon(icon, color: context.colors.ink),
         ),
         title: Text(
-          sport.menuLabel,
+          l10n.sportMenu(sport),
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(color: AppColors.muted, fontSize: 13),
+          style: TextStyle(color: context.colors.muted, fontSize: 13),
         ),
         trailing: Icon(
           enabled && !comingSoon
               ? Icons.arrow_forward_rounded
               : Icons.lock_outline_rounded,
-          color: AppColors.muted,
+          color: context.colors.muted,
         ),
       ),
     );

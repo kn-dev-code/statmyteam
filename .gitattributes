@@ -1,0 +1,7 @@
+# Store and check out text files with LF so diffs are not polluted by
+# Windows/Unix line-ending differences (core.autocrlf varies per machine).
+* text=auto eol=lf
+
+# Windows scripts need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf

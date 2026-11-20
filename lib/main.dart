@@ -1,10 +1,13 @@
+import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'data/favorites_store.dart';
 import 'data/settings_store.dart';
 import 'data/stats_repository.dart';
+import 'l10n/l10n.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_menu_screen.dart';
 import 'state/favorites_scope.dart';
@@ -14,15 +17,121 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  RendererBinding.instance.ensureSemantics();
-  runApp(const _BootstrapApp());
+  installErrorHandlers();
+  runApp(const BootstrapApp());
 }
 
-class _BootstrapApp extends StatefulWidget {
-  const _BootstrapApp();
+/// Receives every uncaught error. [source] says where it came from.
+typedef ErrorReporter = void Function(
+  Object error,
+  StackTrace? stack,
+  String source,
+);
+
+/// The default [ErrorReporter]: writes to the developer log. This is the one
+/// place to plug in a crash-reporting service (Crashlytics, Sentry, ...).
+void logError(Object error, StackTrace? stack, String source) {
+  developer.log(
+    'Uncaught error',
+    name: source,
+    error: error,
+    stackTrace: stack,
+  );
+}
+
+/// Routes uncaught framework and async errors to [reporter].
+///
+/// In release builds async errors are marked handled and failed widgets
+/// show a calm placeholder instead of the grey error box. In debug and
+/// profile builds errors still surface normally (red screen, console) so
+/// they are not missed during development.
+void installErrorHandlers({
+  ErrorReporter reporter = logError,
+  bool releaseMode = kReleaseMode,
+}) {
+  final previous = FlutterError.onError;
+  FlutterError.onError = (details) {
+    reporter(details.exception, details.stack, 'FlutterError');
+    previous?.call(details);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    reporter(error, stack, 'PlatformDispatcher');
+    // false lets the engine print it too (debug); true swallows it (release).
+    return releaseMode;
+  };
+
+  if (releaseMode) {
+    ErrorWidget.builder = (_) => const ErrorPlaceholder();
+  }
+}
+
+/// Shown in place of a widget that failed to build (release builds only).
+class ErrorPlaceholder extends StatelessWidget {
+  const ErrorPlaceholder({super.key});
 
   @override
-  State<_BootstrapApp> createState() => _BootstrapAppState();
+  Widget build(BuildContext context) {
+    // This can be built outside the app's Localizations, so fall back to
+    // English rather than throwing again.
+    final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 28),
+              const SizedBox(height: 8),
+              Text(
+                l10n?.errorWidgetTitle ?? 'Something went wrong',
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                l10n?.errorWidgetBody ??
+                    'This part of the screen could not be shown.',
+                textAlign: TextAlign.center,
+                textDirection: TextDirection.ltr,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Localization setup shared by every [MaterialApp] in the app.
+const _localizationsDelegates = [
+  AppLocalizations.delegate,
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+/// Loads stores and league data, showing a loading screen, then the app; on
+/// failure shows a short error with Retry.
+class BootstrapApp extends StatefulWidget {
+  const BootstrapApp({
+    super.key,
+    this.loadRepository = StatsRepository.live,
+    this.openFavorites = FavoritesStore.open,
+    this.openSettings = SettingsStore.open,
+  });
+
+  /// Source of league data; tests inject a fake.
+  final Future<StatsRepository> Function() loadRepository;
+
+  /// Local stores; tests inject fakes (for example one that fails).
+  final Future<FavoritesStore> Function() openFavorites;
+  final Future<SettingsStore> Function() openSettings;
+
+  @override
+  State<BootstrapApp> createState() => _BootstrapAppState();
 }
 
 typedef _Boot = ({
@@ -31,17 +140,68 @@ typedef _Boot = ({
   SettingsStore settings,
 });
 
-class _BootstrapAppState extends State<_BootstrapApp> {
+class _BootstrapAppState extends State<BootstrapApp> {
   late Future<_Boot> _boot = _load();
+  StatsRepository? _repo;
+  FavoritesStore? _favorites;
+  SettingsStore? _settings;
+
+  /// Bumped on every (re)load so a slow repository from an abandoned
+  /// attempt can be recognised and closed.
+  int _attempt = 0;
 
   Future<_Boot> _load() async {
-    final favorites = FavoritesStore.open();
-    final settings = SettingsStore.open();
-    final repo = StatsRepository.live();
+    final attempt = ++_attempt;
+    // Release everything the previous attempt created before starting over.
+    _release();
 
-    // Wait on all three together so an early failure in one is observed
-    // immediately rather than left unhandled while the slow repo loads.
-    await Future.wait<Object>([favorites, settings, repo]);
+    // Keep each resource as soon as it exists, even if another one fails,
+    // so it is always released on retry or dispose. A result that arrives
+    // after a newer attempt started (or after dispose) is released at once.
+    Future<T> track<T extends Object>(
+      Future<T> Function() open,
+      void Function(T value) keep,
+      void Function(T value) release,
+    ) =>
+        // Future.sync turns a synchronous throw into a failed future.
+        Future.sync(open).then((value) {
+          if (attempt == _attempt && mounted) {
+            keep(value);
+          } else {
+            release(value);
+          }
+          return value;
+        });
+
+    final favorites = track(
+      widget.openFavorites,
+      (v) => _favorites = v,
+      (v) => v.dispose(),
+    );
+    final settings = track(
+      widget.openSettings,
+      (v) => _settings = v,
+      (v) => v.dispose(),
+    );
+    final repo = track(
+      widget.loadRepository,
+      (v) => _repo = v,
+      (v) => v.close(),
+    );
+
+    try {
+      // eagerError: a fast failure (e.g. local storage) shows the error
+      // screen right away instead of waiting for the slow league load.
+      await Future.wait<Object>([favorites, settings, repo], eagerError: true);
+    } catch (error, stack) {
+      developer.log(
+        'App startup failed',
+        name: 'Bootstrap',
+        error: error,
+        stackTrace: stack,
+      );
+      rethrow;
+    }
     return (
       repo: await repo,
       favorites: await favorites,
@@ -49,77 +209,58 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     );
   }
 
+  /// Closes the repository and disposes the stores this widget created.
+  /// Only called when nothing uses them any more: on Retry (shown only on
+  /// the error screen) and on dispose (after the app below is torn down).
+  void _release() {
+    _repo?.close();
+    _favorites?.dispose();
+    _settings?.dispose();
+    _repo = null;
+    _favorites = null;
+    _settings = null;
+  }
+
+  @override
+  void dispose() {
+    _attempt++; // Anything still loading is released when it arrives.
+    _release();
+    super.dispose();
+  }
+
+  Widget _shell(Widget home) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    onGenerateTitle: (context) => context.l10n.appTitle,
+    theme: AppTheme.light(),
+    darkTheme: AppTheme.dark(),
+    localizationsDelegates: _localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: home,
+  );
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_Boot>(
       future: _boot,
       builder: (context, snapshot) {
-        AppColors.use(
-          WidgetsBinding.instance.platformDispatcher.platformBrightness,
-        );
+        // A retried future keeps the previous error until it settles, so
+        // check the state first: show the spinner while (re)loading.
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _shell(const _BootLoading());
+        }
 
         if (snapshot.hasError) {
-          final message = snapshot.error.toString();
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark(),
-            home: Scaffold(
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, size: 40),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Could not start StatMyTeam',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        message,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        onPressed: () => setState(() {
-                          _boot = _load();
-                        }),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          return _shell(
+            _BootError(
+              onRetry: () => setState(() {
+                _boot = _load();
+              }),
             ),
           );
         }
 
-        if (!snapshot.hasData) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark(),
-            home: const Scaffold(
-              body: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading live league data…'),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        final data = snapshot.data!;
+        final data = snapshot.data;
+        if (data == null) return _shell(const _BootLoading());
 
         return StatMyTeamApp(
           repository: data.repo,
@@ -131,7 +272,64 @@ class _BootstrapAppState extends State<_BootstrapApp> {
   }
 }
 
-class StatMyTeamApp extends StatefulWidget {
+class _BootLoading extends StatelessWidget {
+  const _BootLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(context.l10n.loadingLiveData),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Startup failure. Shows a short explanation only; the technical detail
+/// was logged in [_BootstrapAppState._load].
+class _BootError extends StatelessWidget {
+  const _BootError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 40),
+              const SizedBox(height: 16),
+              Text(
+                l10n.bootFailedTitle,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.bootFailedBody, textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StatMyTeamApp extends StatelessWidget {
   StatMyTeamApp({
     super.key,
     required this.repository,
@@ -148,123 +346,28 @@ class StatMyTeamApp extends StatefulWidget {
   final bool showLogin;
 
   @override
-  State<StatMyTeamApp> createState() =>
-      _StatMyTeamAppState();
-}
-
-/// Applies saved light/dark/system preferences
-/// and reacts to OS theme changes.
-class _StatMyTeamAppState extends State<StatMyTeamApp>
-    with WidgetsBindingObserver {
-
-  @override
-  void initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addObserver(this);
-
-    widget.settings.addListener(_applyBrightness);
-
-    AppColors.use(_resolveBrightness());
-  }
-
-  @override
-  void didUpdateWidget(covariant StatMyTeamApp oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.settings != widget.settings) {
-      oldWidget.settings.removeListener(_applyBrightness);
-
-      widget.settings.addListener(_applyBrightness);
-
-      AppColors.use(_resolveBrightness());
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.settings.removeListener(_applyBrightness);
-
-    WidgetsBinding.instance.removeObserver(this);
-
-    super.dispose();
-  }
-
-  @override
-  void didChangePlatformBrightness() {
-    _applyBrightness();
-  }
-
-  Brightness _resolveBrightness() =>
-      switch (widget.settings.themeMode) {
-        ThemeMode.light => Brightness.light,
-        ThemeMode.dark => Brightness.dark,
-        ThemeMode.system =>
-          WidgetsBinding
-              .instance
-              .platformDispatcher
-              .platformBrightness,
-      };
-
-  void _applyBrightness() {
-    if (!mounted) return;
-
-    final next = _resolveBrightness();
-
-    if (next == AppColors.brightness) return;
-
-    AppColors.use(next);
-
-    // Rebuild widgets using AppColors directly.
-    void rebuild(Element element) {
-      element.markNeedsBuild();
-      element.visitChildren(rebuild);
-    }
-
-    (context as Element).visitChildren(rebuild);
-
-    setState(() {});
-  }
-
-  @override
   Widget build(BuildContext context) {
     return SettingsScope(
-      store: widget.settings,
+      store: settings,
       child: FavoritesScope(
-        store: widget.favorites,
+        store: favorites,
         child: StatsScope(
-          repository: widget.repository,
-          child: MaterialApp(
-            title: 'StatMyTeam',
-            debugShowCheckedModeBanner: false,
-
-            theme: AppTheme.current().copyWith(
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: AppColors.surfaceHigh,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: AppColors.border,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: AppColors.border,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(
-                    color: AppColors.accent,
-                  ),
-                ),
-              ),
+          repository: repository,
+          // Only MaterialApp depends on the theme mode; it follows the OS
+          // brightness itself when the mode is "system", and widgets read
+          // colors through Theme, so nothing else needs rebuilding by hand.
+          child: ListenableBuilder(
+            listenable: settings,
+            builder: (context, _) => MaterialApp(
+              onGenerateTitle: (context) => context.l10n.appTitle,
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: settings.themeMode,
+              localizationsDelegates: _localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: showLogin ? const LoginScreen() : const MainMenuScreen(),
             ),
-            home: widget.showLogin
-                ? const LoginScreen()
-                : const MainMenuScreen(),
           ),
         ),
       ),

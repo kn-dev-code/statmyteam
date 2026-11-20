@@ -6,7 +6,7 @@ import '../theme/app_theme.dart';
 /// A team color that stays readable on the current card surface: not too
 /// light on white cards, not too dark on charcoal ones. White text on it
 /// (badges, jersey discs) stays legible in both modes.
-Color teamColor(Team team) {
+Color teamColor(BuildContext context, Team team) {
   final primary = Color(team.primaryColor);
   final secondary = Color(team.secondaryColor);
   bool tooLight(Color c) => c.computeLuminance() >= 0.5;
@@ -20,7 +20,7 @@ Color teamColor(Team team) {
   } else {
     base = Color.lerp(primary, Colors.black, 0.45)!;
   }
-  if (AppColors.isDark && tooDark(base)) {
+  if (context.colors.isDark && tooDark(base)) {
     if (!tooDark(secondary) && !tooLight(secondary)) return secondary;
     return Color.lerp(base, Colors.white, 0.3)!;
   }
@@ -37,7 +37,7 @@ class TeamBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = teamColor(team);
+    final color = teamColor(context, team);
     final ring = size >= 56 ? 6.0 : (size >= 36 ? 3.5 : 2.0);
     return Container(
       width: size,
@@ -45,8 +45,8 @@ class TeamBadge extends StatelessWidget {
       padding: EdgeInsets.all(ring),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border, width: 1.2),
+        color: context.colors.surface,
+        border: Border.all(color: context.colors.border, width: 1.2),
         boxShadow: size >= 56
             ? [
                 BoxShadow(
@@ -87,5 +87,3 @@ class TeamBadge extends StatelessWidget {
     );
   }
 }
-
-/// Rounded white card used across the stats screens.

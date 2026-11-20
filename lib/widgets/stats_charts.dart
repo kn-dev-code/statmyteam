@@ -1,6 +1,8 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/football_stats.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -22,8 +24,8 @@ class RecentFormChart extends StatelessWidget {
     final chronological = games.reversed.toList();
     if (chronological.isEmpty) {
       return Text(
-        'No recent scores to chart',
-        style: TextStyle(color: AppColors.muted),
+        context.l10n.noRecentScores,
+        style: TextStyle(color: context.colors.muted),
       );
     }
 
@@ -42,82 +44,99 @@ class RecentFormChart extends StatelessWidget {
     final minY = spots
         .map((s) => s.y)
         .fold<double>(maxY, (a, b) => a < b ? a : b);
+    final dayFormat = DateFormat.Md(
+      Localizations.localeOf(context).toLanguageTag(),
+    );
 
-    return SizedBox(
-      height: 180,
-      child: LineChart(
-        LineChartData(
-          minY: (minY - 4).clamp(0, 100),
-          maxY: maxY + 6,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (_) => FlLine(
-              color: AppColors.border,
-              strokeWidth: 1,
-              dashArray: [4, 4],
+    final l10n = context.l10n;
+    final summary = l10n.chartRecentScores(
+      spots.length,
+      spots.map((s) => l10n.decimal(s.y, 0)).join(l10n.listSeparator),
+    );
+
+    // fl_chart draws to a canvas; give screen readers the numbers instead.
+    return Semantics(
+      label: summary,
+      excludeSemantics: true,
+      child: SizedBox(
+        height: 180,
+        child: LineChart(
+          LineChartData(
+            minY: (minY - 4).clamp(0, 100),
+            maxY: maxY + 6,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) => FlLine(
+                color: context.colors.border,
+                strokeWidth: 1,
+                dashArray: [4, 4],
+              ),
             ),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 28,
-                getTitlesWidget: (value, _) => Text(
-                  value.toInt().toString(),
-                  style: TextStyle(color: AppColors.muted, fontSize: 10),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, _) => Text(
+                    context.l10n.decimal(value, 0),
+                    style: TextStyle(color: context.colors.muted, fontSize: 10),
+                  ),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: 1,
+                  getTitlesWidget: (value, _) {
+                    final i = value.toInt();
+                    if (i < 0 || i >= chronological.length) {
+                      return const SizedBox.shrink();
+                    }
+                    final d = chronological[i].startTime.toLocal();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        dayFormat.format(d),
+                        style: TextStyle(
+                          color: context.colors.muted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 1,
-                getTitlesWidget: (value, _) {
-                  final i = value.toInt();
-                  if (i < 0 || i >= chronological.length) {
-                    return const SizedBox.shrink();
-                  }
-                  final d = chronological[i].startTime.toLocal();
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      '${d.month}/${d.day}',
-                      style: TextStyle(color: AppColors.muted, fontSize: 10),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              color: color,
-              barWidth: 3,
-              dotData: FlDotData(
-                show: true,
-                getDotPainter: (_, _, _, _) => FlDotCirclePainter(
-                  radius: 4,
-                  color: AppColors.surface,
-                  strokeWidth: 2.5,
-                  strokeColor: color,
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                color: color,
+                barWidth: 3,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (_, _, _, _) => FlDotCirclePainter(
+                    radius: 4,
+                    color: context.colors.surface,
+                    strokeWidth: 2.5,
+                    strokeColor: color,
+                  ),
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: color.withValues(alpha: 0.10),
                 ),
               ),
-              belowBarData: BarAreaData(
-                show: true,
-                color: color.withValues(alpha: 0.10),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -147,8 +166,8 @@ class PlayerStatBarsChart extends StatelessWidget {
 
     if (rows.isEmpty) {
       return Text(
-        'No chartable season stats yet',
-        style: TextStyle(color: AppColors.muted),
+        context.l10n.noChartableStats,
+        style: TextStyle(color: context.colors.muted),
       );
     }
 
@@ -156,65 +175,92 @@ class PlayerStatBarsChart extends StatelessWidget {
         .map((r) => r.value.abs())
         .fold<double>(1, (a, b) => a > b ? a : b);
 
-    return SizedBox(
-      height: 180,
-      child: BarChart(
-        BarChartData(
-          maxY: maxValue * 1.15,
-          gridData: const FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
+    final l10n = context.l10n;
+    final summary = l10n.chartPlayerStats(
+      rows
+          .map(
+            (r) => l10n.chartStatValue(
+              l10n.stat(r.def),
+              l10n.statValue(r.def, r.value),
             ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, _) {
-                  final i = value.toInt();
-                  if (i < 0 || i >= rows.length) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      rows[i].def.label.split(' ').first,
-                      style: TextStyle(color: AppColors.muted, fontSize: 10),
-                    ),
-                  );
-                },
+          )
+          .join(l10n.listSeparator),
+    );
+
+    return Semantics(
+      label: summary,
+      excludeSemantics: true,
+      child: SizedBox(
+        height: 180,
+        child: BarChart(
+          BarChartData(
+            maxY: maxValue * 1.15,
+            gridData: const FlGridData(show: false),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 34,
+                  getTitlesWidget: (value, _) {
+                    final i = value.toInt();
+                    if (i < 0 || i >= rows.length) {
+                      return const SizedBox.shrink();
+                    }
+                    // Full label, wrapped to two lines; cutting at the first
+                    // space breaks languages that do not use spaces.
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: SizedBox(
+                        width: 60,
+                        child: Text(
+                          l10n.stat(rows[i].def),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: context.colors.muted,
+                            fontSize: 9,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
+            barGroups: [
+              for (var i = 0; i < rows.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: rows[i].value.abs(),
+                      width: 22,
+                      borderRadius: BorderRadius.circular(11),
+                      color: color,
+                      backDrawRodData: BackgroundBarChartRodData(
+                        show: true,
+                        toY: maxValue * 1.15,
+                        color: context.colors.surfaceHigh,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
-          barGroups: [
-            for (var i = 0; i < rows.length; i++)
-              BarChartGroupData(
-                x: i,
-                barRods: [
-                  BarChartRodData(
-                    toY: rows[i].value.abs(),
-                    width: 22,
-                    borderRadius: BorderRadius.circular(11),
-                    color: color,
-                    backDrawRodData: BackgroundBarChartRodData(
-                      show: true,
-                      toY: maxValue * 1.15,
-                      color: AppColors.surfaceHigh,
-                    ),
-                  ),
-                ],
-              ),
-          ],
         ),
       ),
     );
   }
 }
-
-/// Favorite team tile used in the home favorites grid.

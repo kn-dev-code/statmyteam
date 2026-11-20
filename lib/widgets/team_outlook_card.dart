@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/sport_stats.dart';
 import '../theme/app_theme.dart';
 import 'stats_widgets.dart';
@@ -12,25 +13,28 @@ class TeamOutlookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return StatCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            outlook.summary,
+            l10n.outlookSummary(outlook),
             style: const TextStyle(height: 1.4, fontSize: 14.5),
           ),
           if (outlook.strengths.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const _Label('Strengths', icon: Icons.arrow_upward_rounded),
+            _Label(l10n.strengths, icon: Icons.arrow_upward_rounded),
             const SizedBox(height: 8),
-            for (final trait in outlook.strengths) _TraitTile(trait: trait),
+            for (final trait in outlook.strengths)
+              _TraitTile(trait: trait, outlook: outlook),
           ],
           if (outlook.weaknesses.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const _Label('Weaknesses', icon: Icons.arrow_downward_rounded),
+            _Label(l10n.weaknesses, icon: Icons.arrow_downward_rounded),
             const SizedBox(height: 8),
-            for (final trait in outlook.weaknesses) _TraitTile(trait: trait),
+            for (final trait in outlook.weaknesses)
+              _TraitTile(trait: trait, outlook: outlook),
           ],
         ],
       ),
@@ -46,32 +50,39 @@ class _Label extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.muted),
-        const SizedBox(width: 6),
-        Text(
-          text.toUpperCase(),
-          style: TextStyle(
-            color: AppColors.muted,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.1,
+    return Semantics(
+      header: true,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: context.colors.muted),
+          const SizedBox(width: 6),
+          Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              color: context.colors.muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _TraitTile extends StatelessWidget {
-  const _TraitTile({required this.trait});
+  const _TraitTile({required this.trait, required this.outlook});
 
   final TeamTrait trait;
+  final TeamOutlook outlook;
 
   @override
   Widget build(BuildContext context) {
-    final color = trait.isStrength ? AppColors.accent : AppColors.danger;
+    final l10n = context.l10n;
+    final color = trait.isStrength
+        ? context.colors.accent
+        : context.colors.danger;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -89,13 +100,13 @@ class _TraitTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  trait.headline,
+                  l10n.traitHeadline(trait),
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  trait.detail,
-                  style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+                  l10n.traitDetailFor(trait, outlook.team),
+                  style: TextStyle(color: context.colors.muted, fontSize: 12.5),
                 ),
               ],
             ),

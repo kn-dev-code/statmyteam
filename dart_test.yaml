@@ -1,0 +1,5 @@
+tags:
+  # Tests that call real network services (see test/live_api_smoke_test.dart).
+  # Skipped by default; run with: flutter test --run-skipped --tags live
+  live:
+    skip: "Hits the live ESPN API. Run with --run-skipped --tags live."

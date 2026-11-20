@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 
 import '../../models/models.dart';
+import '../load_status.dart';
 import 'espn_http.dart';
 import 'espn_leagues.dart';
 
@@ -31,8 +32,8 @@ class EspnLeagueData {
   final List<Team> opponents;
 
   /// Parts of the feed that failed while the league as a whole still loaded,
-  /// e.g. `3 of 30 rosters`. Empty when everything loaded.
-  final List<String> warnings;
+  /// e.g. 3 of 30 rosters. Empty when everything loaded.
+  final List<FeedGap> warnings;
 }
 
 /// Live teams, rosters, team stats, and schedules for one ESPN league,
@@ -52,10 +53,10 @@ class EspnLeagueApi {
     // 12 → 3.1s, 24 → 2.6s, 48 → 2.6s.
     this.concurrency = 24,
   }) : _http = EspnHttp(
-          client ?? http.Client(),
-          timeout: timeout,
-          retryDelay: retryDelay,
-        );
+         client ?? http.Client(),
+         timeout: timeout,
+         retryDelay: retryDelay,
+       );
 
   final EspnLeague league;
   final int concurrency;
@@ -99,7 +100,7 @@ class EspnLeagueApi {
     }
     final season = '$seasonYear';
 
-    final failures = <String, int>{};
+    final failures = <FeedPart, int>{};
     final bundles = await mapWithConcurrency(
       standings,
       concurrency,
@@ -107,7 +108,7 @@ class EspnLeagueApi {
     );
 
     final total = bundles.length;
-    final failedRosters = failures['rosters'] ?? 0;
+    final failedRosters = failures[FeedPart.rosters] ?? 0;
     if (failedRosters * 2 > total) {
       throw EspnDataException(
         '$failedRosters of $total ${league.league.label} rosters failed to '
@@ -115,8 +116,8 @@ class EspnLeagueApi {
       );
     }
     final warnings = [
-      for (final MapEntry(key: kind, value: count) in failures.entries)
-        '$count of $total $kind',
+      for (final part in FeedPart.values)
+        if (failures[part] case final count?) FeedGap(part, count, total),
     ];
     if (warnings.isNotEmpty) {
       developer.log(
@@ -170,6 +171,13 @@ class EspnLeagueApi {
     final teamIds = {for (final t in teams) t.id};
     opponents.removeWhere((id, _) => teamIds.contains(id));
 
+    // A competitor without a team object yields an id that resolves to no
+    // team; such games could not be labelled, so leave them out.
+    bool known(String id) => teamIds.contains(id) || opponents.containsKey(id);
+    gamesById.removeWhere(
+      (_, game) => !known(game.homeTeamId) || !known(game.awayTeamId),
+    );
+
     return EspnLeagueData(
       league: league,
       seasonYear: seasonYear,
@@ -188,11 +196,11 @@ class EspnLeagueApi {
   Future<_TeamBundle> _loadTeam(
     _StandingEntry entry, {
     required int seasonYear,
-    required Map<String, int> failures,
+    required Map<FeedPart, int> failures,
   }) async {
     final id = entry.espnId;
-    Future<Map<String, dynamic>?> part(String url, String kind) async {
-      final json = await _soft(_http.getJson(url), 'team $id $kind');
+    Future<Map<String, dynamic>?> part(String url, FeedPart kind) async {
+      final json = await _soft(_http.getJson(url), 'team $id ${kind.name}');
       if (json == null) failures.update(kind, (n) => n + 1, ifAbsent: () => 1);
       return json;
     }
@@ -201,10 +209,10 @@ class EspnLeagueApi {
       part(
         '${league.coreBase}/seasons/$seasonYear/types/'
         '${league.regularSeasonType}/teams/$id/statistics',
-        'team stats',
+        FeedPart.teamStats,
       ),
-      part('${league.siteBase}/teams/$id/roster', 'rosters'),
-      part('${league.siteBase}/teams/$id/schedule', 'schedules'),
+      part('${league.siteBase}/teams/$id/roster', FeedPart.rosters),
+      part('${league.siteBase}/teams/$id/schedule', FeedPart.schedules),
     ]);
     return _TeamBundle(
       stats: parseEspnStats(results[0]),
@@ -228,14 +236,14 @@ class EspnLeagueApi {
         if (team is! Map<String, dynamic>) continue;
         final id = '${team['id']}';
         if (!seen.add(id)) continue;
-        out.add(_StandingEntry(
-          espnId: id,
-          identity: _TeamIdentity.fromJson(team),
-          group: league.useDivisions
-              ? (_str(node['name']) ?? label)
-              : label,
-          record: _parseRecord(_list(entry['stats'])),
-        ));
+        out.add(
+          _StandingEntry(
+            espnId: id,
+            identity: _TeamIdentity.fromJson(team),
+            group: league.useDivisions ? (_str(node['name']) ?? label) : label,
+            record: _parseRecord(_list(entry['stats'])),
+          ),
+        );
       }
       for (final child in (_list(node['children']) ?? const [])) {
         if (child is Map<String, dynamic>) visit(child, label);
@@ -362,8 +370,7 @@ class EspnLeagueApi {
     final countByPosition = <String, int>{};
     final players = <Player>[];
     for (final map in athletes) {
-      final rawPosition =
-          _str(_map(map['position'])?['abbreviation']) ?? '';
+      final rawPosition = _str(_map(map['position'])?['abbreviation']) ?? '';
       final position = league.position(rawPosition);
       final injuries = _list(map['injuries']) ?? const [];
       final experience = map['experience'];
@@ -375,8 +382,8 @@ class EspnLeagueApi {
         Player(
           id: league.playerId('${map['id']}'),
           firstName: _str(map['firstName']) ?? '',
-          lastName: _str(map['lastName']) ??
-              (_str(map['displayName']) ?? 'Player'),
+          lastName:
+              _str(map['lastName']) ?? (_str(map['displayName']) ?? 'Player'),
           teamId: teamId,
           position: position,
           jerseyNumber: int.tryParse('${map['jersey'] ?? ''}') ?? 0,
@@ -400,8 +407,8 @@ class EspnLeagueApi {
           role: depth == 0
               ? DepthRole.starter
               : depth < 3
-                  ? DepthRole.rotation
-                  : DepthRole.backup,
+              ? DepthRole.rotation
+              : DepthRole.backup,
         ),
       );
     }
@@ -450,17 +457,16 @@ class EspnLeagueApi {
       final competitions = _list(event['competitions']) ?? const [];
       if (competitions.isEmpty || competitions.first is! Map) continue;
       final comp = competitions.first as Map<String, dynamic>;
-      final statusType =
-          _map(_map(comp['status'])?['type']) ?? const {};
+      final statusType = _map(_map(comp['status'])?['type']) ?? const {};
       final statusName = _str(statusType['name']) ?? '';
       final statusState = _str(statusType['state']) ?? '';
       final completed =
           statusType['completed'] == true || statusName == 'STATUS_FINAL';
-      final live = statusState == 'in' ||
+      final live =
+          statusState == 'in' ||
           statusName == 'STATUS_IN_PROGRESS' ||
           statusName == 'STATUS_HALFTIME';
-      if (statusName == 'STATUS_POSTPONED' ||
-          statusName == 'STATUS_CANCELED') {
+      if (statusName == 'STATUS_POSTPONED' || statusName == 'STATUS_CANCELED') {
         continue;
       }
 
@@ -476,7 +482,8 @@ class EspnLeagueApi {
       }
       if (home == null || away == null) continue;
 
-      final start = DateTime.tryParse(_str(event['date']) ?? '') ??
+      final start =
+          DateTime.tryParse(_str(event['date']) ?? '') ??
           DateTime.tryParse(_str(comp['date']) ?? '');
       if (start == null) continue;
       if (!completed && !live && !start.isAfter(now)) continue;
@@ -509,7 +516,9 @@ class EspnLeagueApi {
     Map<String, Team> opponents,
   ) {
     final team = competitor['team'];
-    final espnId = team is Map ? team['id'] ?? competitor['id'] : competitor['id'];
+    final espnId = team is Map
+        ? team['id'] ?? competitor['id']
+        : competitor['id'];
     final id = league.teamId('$espnId');
     if (team is Map<String, dynamic> && !opponents.containsKey(id)) {
       final identity = _TeamIdentity.fromJson(team);
@@ -522,8 +531,7 @@ class EspnLeagueApi {
         season: '',
         league: league.league,
         primaryColor: _parseColor(_str(team['color']), 0xFF8A8F98),
-        secondaryColor:
-            _parseColor(_str(team['alternateColor']), 0xFFFFFFFF),
+        secondaryColor: _parseColor(_str(team['alternateColor']), 0xFFFFFFFF),
       );
     }
     return id;
@@ -592,7 +600,8 @@ class _TeamIdentity {
 
   factory _TeamIdentity.fromJson(Map<String, dynamic> json) {
     final location = _str(json['location']) ?? '';
-    final name = _str(json['name']) ??
+    final name =
+        _str(json['name']) ??
         _str(json['nickname']) ??
         _str(json['shortDisplayName']) ??
         'Team';

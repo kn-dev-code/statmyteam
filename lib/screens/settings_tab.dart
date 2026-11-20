@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../models/models.dart';
+import '../l10n/l10n.dart';
 import '../state/settings_scope.dart';
 import '../state/stats_scope.dart';
 import '../theme/app_theme.dart';
@@ -13,11 +13,12 @@ class SettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final settings = SettingsScope.of(context);
     final repo = StatsScope.of(context);
 
     return Scaffold(
-      appBar: const PillAppBar(title: 'Settings'),
+      appBar: PillAppBar(title: l10n.settingsTitle),
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -27,30 +28,31 @@ class SettingsTab extends StatelessWidget {
             FloatingNavBar.clearance,
           ),
           children: [
-            const SectionTitle(
-              'Appearance',
-              subtitle: 'System follows your device setting',
-            ),
+            SectionTitle(l10n.appearance, subtitle: l10n.appearanceSubtitle),
             Row(
               children: [
-                for (final (mode, label) in const [
-                  (ThemeMode.system, 'System'),
-                  (ThemeMode.light, 'Light'),
-                  (ThemeMode.dark, 'Dark'),
+                for (final mode in const [
+                  ThemeMode.system,
+                  ThemeMode.light,
+                  ThemeMode.dark,
                 ]) ...[
                   if (mode != ThemeMode.system) const SizedBox(width: 10),
                   Expanded(
                     child: _ModeCard(
                       mode: mode,
-                      label: label,
+                      label: l10n.themeMode(mode.name),
                       selected: settings.themeMode == mode,
-                      onTap: () => settings.setThemeMode(mode),
+                      onTap: () => saveWithFeedback(
+                        context,
+                        () => settings.setThemeMode(mode),
+                        failureMessage: l10n.themeSaveFailed,
+                      ),
                     ),
                   ),
                 ],
               ],
             ),
-            const SectionTitle('Data'),
+            SectionTitle(l10n.dataSection),
             StatCard(
               child: Row(
                 children: [
@@ -58,14 +60,14 @@ class SettingsTab extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceHigh,
+                      color: context.colors.surfaceHigh,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       repo.isLive
                           ? Icons.cloud_done_outlined
                           : Icons.science_outlined,
-                      color: AppColors.text,
+                      color: context.colors.text,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -74,7 +76,7 @@ class SettingsTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          repo.isLive ? 'Live data' : 'Sample data',
+                          repo.isLive ? l10n.liveData : l10n.sampleData,
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
@@ -83,19 +85,16 @@ class SettingsTab extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           !repo.isLive
-                              ? 'Teams and players are fictional while '
-                                    'testing.'
+                              ? l10n.settingsSampleOnly
                               : repo.sampleLeagues.isEmpty
-                              ? 'Teams, rosters, games, and player stats '
-                                    'load from ESPN.'
-                              : '${League.describe(repo.liveLeagues)} load '
-                                    'from ESPN. '
-                                    '${League.describe(repo.sampleLeagues)} '
-                                    'could not load and '
-                                    '${repo.sampleLeagues.length == 1 ? 'uses' : 'use'} '
-                                    'sample data.',
+                              ? l10n.settingsAllLive
+                              : l10n.settingsMixed(
+                                  l10n.leagues(repo.liveLeagues),
+                                  l10n.leagues(repo.sampleLeagues),
+                                  repo.sampleLeagues.length,
+                                ),
                           style: TextStyle(
-                            color: AppColors.muted,
+                            color: context.colors.muted,
                             fontSize: 12.5,
                           ),
                         ),
@@ -187,14 +186,14 @@ class _ModeCard extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '$label theme',
+      label: context.l10n.themeSemantics(label),
       excludeSemantics: true,
       child: Material(
-        color: AppColors.surface,
+        color: context.colors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
           side: BorderSide(
-            color: selected ? AppColors.ink : Colors.transparent,
+            color: selected ? context.colors.ink : Colors.transparent,
             width: 2,
           ),
         ),
@@ -218,14 +217,24 @@ class _ModeCard extends StatelessWidget {
                           ? Icons.radio_button_checked_rounded
                           : Icons.radio_button_off_rounded,
                       size: 18,
-                      color: selected ? AppColors.ink : AppColors.muted,
+                      color: selected
+                          ? context.colors.ink
+                          : context.colors.muted,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                    // Three cards share a narrow row; shrink the label
+                    // rather than overflow at large text sizes.
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
                       ),
                     ),
                   ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import 'team_badge.dart';
@@ -14,7 +15,7 @@ class FavoriteTeamTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct = (team.winPercentage * 100).round();
     return Material(
-      color: AppColors.surface,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(AppTheme.radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -50,20 +51,29 @@ class FavoriteTeamTile extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    team.record,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                      letterSpacing: -0.5,
-                      height: 1,
+                  // Shrinks instead of overflowing at large text sizes.
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        team.record,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                          letterSpacing: -0.5,
+                          height: 1,
+                        ),
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 6),
                   Text(
-                    '$pct%',
+                    context.l10n.percent(team.winPercentage),
                     style: TextStyle(
-                      color: pct >= 50 ? AppColors.accent : AppColors.danger,
+                      color: pct >= 50
+                          ? context.colors.accent
+                          : context.colors.danger,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -75,8 +85,10 @@ class FavoriteTeamTile extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: team.winPercentage,
                   minHeight: 5,
-                  color: pct >= 50 ? AppColors.accent : AppColors.danger,
-                  backgroundColor: AppColors.surfaceHigh,
+                  color: pct >= 50
+                      ? context.colors.accent
+                      : context.colors.danger,
+                  backgroundColor: context.colors.surfaceHigh,
                 ),
               ),
             ],

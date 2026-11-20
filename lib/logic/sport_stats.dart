@@ -3,39 +3,40 @@ import 'football_stats.dart';
 
 export 'football_stats.dart' show StatDef;
 
-/// Team-level stat lines, position labels, and strength/weakness copy
-/// for each sport StatMyTeam can compare.
+/// Team-level stat lines and per-position player stats for each sport
+/// StatMyTeam can compare. Display text (labels, position names, trait
+/// copy) is localized in the UI layer.
 class SportStats {
   SportStats._();
 
   static const basketballTeamStats = <StatDef>[
-    StatDef('ppg', 'Points / game', decimals: 1),
-    StatDef('papg', 'Points allowed / game', decimals: 1, higherIsBetter: false),
-    StatDef('rpg', 'Rebounds / game', decimals: 1),
-    StatDef('apg', 'Assists / game', decimals: 1),
-    StatDef('spg', 'Steals / game', decimals: 1),
-    StatDef('bpg', 'Blocks / game', decimals: 1),
-    StatDef('fgPct', 'Field goal %', decimals: 1, isPercent: true),
-    StatDef('threePct', 'Three-point %', decimals: 1, isPercent: true),
-    StatDef('toDiff', 'Turnover differential', signed: true),
+    StatDef('ppg', 'pointsPerGame', decimals: 1),
+    StatDef('papg', 'pointsAllowedPerGame', decimals: 1, higherIsBetter: false),
+    StatDef('rpg', 'reboundsPerGame', decimals: 1),
+    StatDef('apg', 'assistsPerGame', decimals: 1),
+    StatDef('spg', 'stealsPerGame', decimals: 1),
+    StatDef('bpg', 'blocksPerGame', decimals: 1),
+    StatDef('fgPct', 'fieldGoalPct', decimals: 1, isPercent: true),
+    StatDef('threePct', 'threePointPct', decimals: 1, isPercent: true),
+    StatDef('toDiff', 'turnoverDifferential', signed: true),
   ];
 
   static const soccerTeamStats = <StatDef>[
-    StatDef('ppg', 'Goals / game', decimals: 2),
-    StatDef('papg', 'Goals allowed / game', decimals: 2, higherIsBetter: false),
-    StatDef('possession', 'Possession', decimals: 1, isPercent: true),
-    StatDef('shotsPg', 'Shots / game', decimals: 1),
-    StatDef('sogPg', 'Shots on target / game', decimals: 1),
-    StatDef('xg', 'Expected goals', decimals: 2),
-    StatDef('xga', 'Expected goals against', decimals: 2, higherIsBetter: false),
-    StatDef('cleanSheetPct', 'Clean sheet rate', decimals: 1, isPercent: true),
+    StatDef('ppg', 'goalsPerGame', decimals: 2),
+    StatDef('papg', 'goalsAllowedPerGame', decimals: 2, higherIsBetter: false),
+    StatDef('possession', 'possession', decimals: 1, isPercent: true),
+    StatDef('shotsPg', 'shotsPerGame', decimals: 1),
+    StatDef('sogPg', 'shotsOnTargetPerGame', decimals: 1),
+    StatDef('xg', 'expectedGoals', decimals: 2),
+    StatDef('xga', 'expectedGoalsAgainst', decimals: 2, higherIsBetter: false),
+    StatDef('cleanSheetPct', 'cleanSheetRate', decimals: 1, isPercent: true),
   ];
 
   static List<StatDef> teamStats(Sport sport) => switch (sport) {
-        Sport.basketball => basketballTeamStats,
-        Sport.soccer => soccerTeamStats,
-        _ => FootballStats.teamStats,
-      };
+    Sport.basketball => basketballTeamStats,
+    Sport.soccer => soccerTeamStats,
+    _ => FootballStats.teamStats,
+  };
 
   static const _basketballPlayerKeys = <String, List<String>>{
     'PG': ['gp', 'pts', 'ast', 'reb', 'fgPct', 'threePct', 'stl', 'tov'],
@@ -56,24 +57,30 @@ class SportStats {
   };
 
   static const _extraPlayerStats = <String, StatDef>{
-    'pts': StatDef('pts', 'Points', decimals: 1),
-    'reb': StatDef('reb', 'Rebounds', decimals: 1),
-    'ast': StatDef('ast', 'Assists', decimals: 1),
-    'stl': StatDef('stl', 'Steals', decimals: 1),
-    'blk': StatDef('blk', 'Blocks', decimals: 1),
-    'tov': StatDef('tov', 'Turnovers', decimals: 1, higherIsBetter: false),
-    'saves': StatDef('saves', 'Saves'),
-    'ga': StatDef('ga', 'Goals allowed', higherIsBetter: false),
-    'cleanSheets': StatDef('cleanSheets', 'Clean sheets'),
-    'savePct': StatDef('savePct', 'Save %', decimals: 1, isPercent: true),
-    'int': StatDef('int', 'Interceptions'),
-    'clr': StatDef('clr', 'Clearances'),
-    'passPct': StatDef('passPct', 'Pass %', decimals: 1, isPercent: true),
-    'goals': StatDef('goals', 'Goals'),
-    'keyPass': StatDef('keyPass', 'Key passes'),
-    'shots': StatDef('shots', 'Shots'),
-    'sog': StatDef('sog', 'Shots on target'),
-    'xg': StatDef('xg', 'Expected goals', decimals: 1),
+    'pts': StatDef('pts', 'points', decimals: 1),
+    'reb': StatDef('reb', 'rebounds', decimals: 1),
+    'ast': StatDef('ast', 'assists', decimals: 1),
+    'stl': StatDef('stl', 'steals', decimals: 1),
+    'blk': StatDef('blk', 'blocks', decimals: 1),
+    'threePct': StatDef(
+      'threePct',
+      'threePointPct',
+      decimals: 1,
+      isPercent: true,
+    ),
+    'tov': StatDef('tov', 'turnovers', decimals: 1, higherIsBetter: false),
+    'saves': StatDef('saves', 'saves'),
+    'ga': StatDef('ga', 'goalsAllowed', higherIsBetter: false),
+    'cleanSheets': StatDef('cleanSheets', 'cleanSheets'),
+    'savePct': StatDef('savePct', 'savePct', decimals: 1, isPercent: true),
+    'int': StatDef('int', 'interceptions'),
+    'clr': StatDef('clr', 'clearances'),
+    'passPct': StatDef('passPct', 'passPct', decimals: 1, isPercent: true),
+    'goals': StatDef('goals', 'goals'),
+    'keyPass': StatDef('keyPass', 'keyPasses'),
+    'shots': StatDef('shots', 'shots'),
+    'sog': StatDef('sog', 'shotsOnTarget'),
+    'xg': StatDef('xg', 'expectedGoals', decimals: 1),
   };
 
   static StatDef playerStat(String key) =>
@@ -103,50 +110,32 @@ class SportStats {
     ];
   }
 
-  static String positionName(Sport sport, String position) => switch (sport) {
-        Sport.basketball => switch (position) {
-            'PG' => 'Point guard',
-            'SG' => 'Shooting guard',
-            'SF' => 'Small forward',
-            'PF' => 'Power forward',
-            'C' => 'Center',
-            'G' => 'Guard',
-            'F' => 'Forward',
-            _ => position,
-          },
-        Sport.soccer => switch (position) {
-            'GK' => 'Goalkeeper',
-            'DEF' => 'Defender',
-            'MID' => 'Midfielder',
-            'FWD' => 'Forward',
-            _ => position,
-          },
-        _ => FootballStats.positionNames[position] ?? position,
-      };
-
-  static const _copy = <String, (String strength, String weakness)>{
-    'ppg': ('Explosive offense', 'Struggles to score'),
-    'papg': ('Stingy defense', 'Leaks points'),
-    'ypg': ('Moves the chains', 'Stalled offense'),
-    'passYpg': ('Aerial attack', 'Limited passing game'),
-    'rushYpg': ('Physical run game', 'Can\'t run the ball'),
-    'yapg': ('Stout defense', 'Gives up yards'),
-    'toDiff': ('Wins the turnover battle', 'Gives the ball away'),
-    'sacks': ('Gets after the passer', 'Rarely pressures the QB'),
-    'thirdPct': ('Converts on schedule', 'Stalls on third down'),
-    'redZonePct': ('Finishes drives', 'Settles for field goals'),
-    'rpg': ('Dominates the glass', 'Loses the rebound battle'),
-    'apg': ('Unselfish ball movement', 'Isolation-heavy offense'),
-    'spg': ('Creates turnovers', 'Passive on the ball'),
-    'bpg': ('Protects the rim', 'Gives up easy looks'),
-    'fgPct': ('Efficient shooting', 'Cold from the field'),
-    'threePct': ('Lights out from three', 'Struggles from deep'),
-    'possession': ('Controls the ball', 'Chases the game'),
-    'shotsPg': ('Creates chances', 'Rarely tests the keeper'),
-    'sogPg': ('Gets shots on target', 'Wayward finishing'),
-    'xg': ('Creates high-quality chances', 'Low expected goals'),
-    'xga': ('Limits quality chances against', 'Concedes dangerous looks'),
-    'cleanSheetPct': ('Keeps clean sheets', 'Rarely shuts teams out'),
+  /// Team stat keys that have hand-written strength / weakness copy
+  /// (`traitStrength` / `traitWeakness` in the ARB files). Other stats fall
+  /// back to "Above / Below average `stat`".
+  static const traitCopyKeys = {
+    'ppg',
+    'papg',
+    'ypg',
+    'passYpg',
+    'rushYpg',
+    'yapg',
+    'toDiff',
+    'sacks',
+    'thirdPct',
+    'redZonePct',
+    'rpg',
+    'apg',
+    'spg',
+    'bpg',
+    'fgPct',
+    'threePct',
+    'possession',
+    'shotsPg',
+    'sogPg',
+    'xg',
+    'xga',
+    'cleanSheetPct',
   };
 }
 
@@ -154,17 +143,19 @@ class SportStats {
 class TeamTrait {
   const TeamTrait({
     required this.def,
-    required this.headline,
-    required this.detail,
+    required this.value,
     required this.isStrength,
     required this.rank,
     required this.of,
   });
 
   final StatDef def;
-  final String headline;
-  final String detail;
+
+  /// The team's value for [def].
+  final double value;
   final bool isStrength;
+
+  /// 1-based rank among [of] league peers.
   final int rank;
   final int of;
 }
@@ -175,13 +166,15 @@ class TeamOutlook {
     required this.team,
     required this.strengths,
     required this.weaknesses,
-    required this.summary,
+    this.graded = true,
   });
 
   final Team team;
   final List<TeamTrait> strengths;
   final List<TeamTrait> weaknesses;
-  final String summary;
+
+  /// False when the league has too few teams to grade against.
+  final bool graded;
 
   /// Ranks [team] against [peers] (same sport and league) on each team stat.
   ///
@@ -197,8 +190,7 @@ class TeamOutlook {
         team: team,
         strengths: const [],
         weaknesses: const [],
-        summary:
-            'Not enough league data yet to grade ${team.displayName} against peers.',
+        graded: false,
       );
     }
 
@@ -212,42 +204,42 @@ class TeamOutlook {
     final weaknesses = <TeamTrait>[];
 
     for (final def in defs) {
-      final scored = [
-        for (final peer in group) (team: peer, value: peer.stat(def.key)),
-      ]..sort((a, b) => def.higherIsBetter
-          ? b.value.compareTo(a.value)
-          : a.value.compareTo(b.value));
+      final scored =
+          [for (final peer in group) (team: peer, value: peer.stat(def.key))]
+            ..sort(
+              (a, b) => def.higherIsBetter
+                  ? b.value.compareTo(a.value)
+                  : a.value.compareTo(b.value),
+            );
 
       final rank = scored.indexWhere((row) => row.team.id == team.id) + 1;
       if (rank == 0) continue;
       final value = team.stat(def.key);
-      final mean = scored.fold<double>(0, (sum, row) => sum + row.value) /
-          scored.length;
-      final betterThanMean =
-          def.higherIsBetter ? value > mean : value < mean;
-      final copy = SportStats._copy[def.key];
+      final mean =
+          scored.fold<double>(0, (sum, row) => sum + row.value) / scored.length;
+      final betterThanMean = def.higherIsBetter ? value > mean : value < mean;
       final of = scored.length;
 
       if (rank <= cutoff && betterThanMean) {
-        strengths.add(TeamTrait(
-          def: def,
-          headline: copy?.$1 ?? 'Above average ${def.label.toLowerCase()}',
-          detail: '${def.format(value)} · $rank${_ordinal(rank)} of $of '
-              'in ${team.league?.label ?? 'the league'}',
-          isStrength: true,
-          rank: rank,
-          of: of,
-        ));
+        strengths.add(
+          TeamTrait(
+            def: def,
+            value: value,
+            isStrength: true,
+            rank: rank,
+            of: of,
+          ),
+        );
       } else if (rank > of - cutoff && !betterThanMean) {
-        weaknesses.add(TeamTrait(
-          def: def,
-          headline: copy?.$2 ?? 'Below average ${def.label.toLowerCase()}',
-          detail: '${def.format(value)} · $rank${_ordinal(rank)} of $of '
-              'in ${team.league?.label ?? 'the league'}',
-          isStrength: false,
-          rank: rank,
-          of: of,
-        ));
+        weaknesses.add(
+          TeamTrait(
+            def: def,
+            value: value,
+            isStrength: false,
+            rank: rank,
+            of: of,
+          ),
+        );
       }
     }
 
@@ -258,44 +250,6 @@ class TeamOutlook {
       team: team,
       strengths: strengths.take(3).toList(),
       weaknesses: weaknesses.take(3).toList(),
-      summary: _summary(team, strengths, weaknesses),
     );
   }
-
-  static String _summary(
-    Team team,
-    List<TeamTrait> strengths,
-    List<TeamTrait> weaknesses,
-  ) {
-    if (strengths.isEmpty && weaknesses.isEmpty) {
-      return '${team.displayName} grades out as a middle-of-the-pack '
-          '${team.league?.label ?? ''} club this season — no stat '
-          'stands far above or below the league.';
-    }
-    final buffer = StringBuffer(team.displayName);
-    if (strengths.isNotEmpty) {
-      buffer.write(' is strongest in ${strengths.first.headline.toLowerCase()}');
-      if (strengths.length > 1) {
-        buffer.write(' and ${strengths[1].headline.toLowerCase()}');
-      }
-      buffer.write('.');
-    } else {
-      buffer.write(' does not have a clear statistical edge this season.');
-    }
-    if (weaknesses.isNotEmpty) {
-      buffer.write(' The main concern is ${weaknesses.first.headline.toLowerCase()}');
-      buffer.write(' (${weaknesses.first.detail.split(' · ').first}).');
-    }
-    return buffer.toString();
-  }
-}
-
-String _ordinal(int n) {
-  if (n % 100 >= 11 && n % 100 <= 13) return 'th';
-  return switch (n % 10) {
-    1 => 'st',
-    2 => 'nd',
-    3 => 'rd',
-    _ => 'th',
-  };
 }

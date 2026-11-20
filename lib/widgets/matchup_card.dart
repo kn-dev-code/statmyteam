@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/stats_repository.dart';
+import '../l10n/l10n.dart';
 import '../logic/matchup_projector.dart';
 import '../models/models.dart';
 import '../screens/matchup_screen.dart';
@@ -9,6 +11,12 @@ import '../theme/app_theme.dart';
 import 'app_chrome.dart';
 import 'stats_widgets.dart';
 
+/// Projections memoized per repository: the inputs (rosters, results) are
+/// immutable for a repository's lifetime, so each matchup and venue is
+/// computed once instead of on every build.
+final _projections =
+    Expando<Map<(String, String, MatchupVenue), MatchupProjection>>();
+
 /// Projection for two teams using the shared repository.
 MatchupProjection projectMatchup(
   BuildContext context,
@@ -17,15 +25,27 @@ MatchupProjection projectMatchup(
   MatchupVenue venue = MatchupVenue.teamAHome,
 }) {
   final repo = StatsScope.of(context);
-  return MatchupProjector.project(
-    teamA: a,
-    teamB: b,
-    rosterA: repo.rosterFor(a.id),
-    rosterB: repo.rosterFor(b.id),
-    headToHead: repo.headToHead(a.id, b.id),
-    venue: venue,
-  );
+  final cache = _projections[repo] ??= {};
+  return cache.putIfAbsent((
+    a.id,
+    b.id,
+    venue,
+  ), () => _project(repo, a, b, venue));
 }
+
+MatchupProjection _project(
+  StatsRepository repo,
+  Team a,
+  Team b,
+  MatchupVenue venue,
+) => MatchupProjector.project(
+  teamA: a,
+  teamB: b,
+  rosterA: repo.rosterFor(a.id),
+  rosterB: repo.rosterFor(b.id),
+  headToHead: repo.headToHead(a.id, b.id),
+  venue: venue,
+);
 
 /// Card for a two-team matchup: label pill, bookmark toggle, both crests,
 /// the projected score, and win-chance pills along the bottom.
@@ -34,29 +54,42 @@ class MatchupCard extends StatelessWidget {
     super.key,
     required this.teamA,
     required this.teamB,
-    this.label = 'Saved matchup',
+    this.label,
   });
 
   final Team teamA;
   final Team teamB;
-  final String label;
+
+  /// Corner label; defaults to "Saved matchup".
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final favorites = FavoritesScope.of(context);
     final saved = favorites.isFavoriteMatchup(teamA.id, teamB.id);
-    final p = projectMatchup(context, teamA, teamB);
+    // Saved pairs have no home team, so show (and open) a neutral site.
+    final p = projectMatchup(
+      context,
+      teamA,
+      teamB,
+      venue: MatchupVenue.neutral,
+    );
     final pctA = (p.teamAWinChance * 100).round();
     final pctB = 100 - pctA;
 
     void open() => Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => MatchupScreen(teamA: teamA, teamB: teamB),
+        builder: (_) => MatchupScreen(
+          teamA: teamA,
+          teamB: teamB,
+          initialVenue: MatchupVenue.neutral,
+        ),
       ),
     );
 
     return Material(
-      color: AppColors.surface,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(AppTheme.radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -67,18 +100,20 @@ class MatchupCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  LabelPill(label),
+                  LabelPill(label ?? l10n.savedMatchupLabel),
                   const Spacer(),
                   RoundIconButton(
-                    tooltip: saved ? 'Remove saved matchup' : 'Save matchup',
+                    tooltip: saved ? l10n.removeSavedMatchup : l10n.saveMatchup,
                     icon: saved
                         ? Icons.bookmark_rounded
                         : Icons.bookmark_border_rounded,
                     size: 48,
                     outlined: true,
-                    iconColor: saved ? AppColors.orange : AppColors.ink,
-                    onPressed: () =>
-                        favorites.toggleMatchup(teamA.id, teamB.id),
+                    iconColor: saved ? AppColors.orange : context.colors.ink,
+                    onPressed: () => saveWithFeedback(
+                      context,
+                      () => favorites.toggleMatchup(teamA.id, teamB.id),
+                    ),
                   ),
                 ],
               ),
@@ -92,7 +127,10 @@ class MatchupCard extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          '${p.teamAScore.round()} : ${p.teamBScore.round()}',
+                          l10n.scoreLine(
+                            l10n.decimal(p.teamAScore, 0),
+                            l10n.decimal(p.teamBScore, 0),
+                          ),
                           style: const TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
@@ -101,9 +139,9 @@ class MatchupCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Projected',
+                          l10n.projected,
                           style: TextStyle(
-                            color: AppColors.muted,
+                            color: context.colors.muted,
                             fontSize: 14,
                           ),
                         ),
@@ -119,14 +157,14 @@ class MatchupCard extends StatelessWidget {
                   Expanded(
                     child: MetricPill(
                       label: teamA.abbreviation,
-                      value: '$pctA%',
-                      valueColor: pctA >= pctB ? AppColors.accent : null,
+                      value: l10n.percent(pctA / 100),
+                      valueColor: pctA >= pctB ? context.colors.accent : null,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: MetricPill(
-                      label: 'Win',
+                      label: l10n.winLabel,
                       value: p.favorite.abbreviation,
                     ),
                   ),
@@ -134,8 +172,8 @@ class MatchupCard extends StatelessWidget {
                   Expanded(
                     child: MetricPill(
                       label: teamB.abbreviation,
-                      value: '$pctB%',
-                      valueColor: pctB > pctA ? AppColors.accent : null,
+                      value: l10n.percent(pctB / 100),
+                      valueColor: pctB > pctA ? context.colors.accent : null,
                     ),
                   ),
                 ],
@@ -173,12 +211,15 @@ class _Side extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           team.record,
-          style: TextStyle(color: AppColors.muted, fontSize: 13),
+          style: TextStyle(color: context.colors.muted, fontSize: 13),
         ),
       ],
     );
   }
 }
+
+/// Width of the overlapping team badges in the banner corner.
+const _badgeClearance = 112.0;
 
 /// Green gradient banner highlighting one matchup, in place of a promo hero.
 class FeaturedMatchupBanner extends StatelessWidget {
@@ -202,6 +243,10 @@ class FeaturedMatchupBanner extends StatelessWidget {
       venue: MatchupVenue.neutral,
     );
     final favPct = (p.favoriteWinChance * 100).round();
+    final l10n = context.l10n;
+    final chance = l10n.favoriteChance(p.favorite.abbreviation, favPct);
+    final toWin = l10n.favoriteToWinNeutral(chance);
+    final chanceAt = toWin.indexOf(chance);
 
     return Material(
       borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -209,7 +254,11 @@ class FeaturedMatchupBanner extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => MatchupScreen(teamA: teamA, teamB: teamB),
+            builder: (_) => MatchupScreen(
+              teamA: teamA,
+              teamB: teamB,
+              initialVenue: MatchupVenue.neutral,
+            ),
           ),
         ),
         child: Ink(
@@ -220,8 +269,10 @@ class FeaturedMatchupBanner extends StatelessWidget {
               colors: [AppColors.heroStart, AppColors.heroEnd],
             ),
           ),
-          child: SizedBox(
-            height: 210,
+          // At least 210 tall, but grows with large text instead of
+          // overflowing.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 210),
             child: Stack(
               children: [
                 // Decorative field stripes and an oversized ball.
@@ -255,60 +306,90 @@ class FeaturedMatchupBanner extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        eyebrow.toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.75),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'GAME\nPREVIEW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 34,
-                          fontWeight: FontWeight.w900,
-                          height: 0.98,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const Spacer(),
-                      _VsPill(a: teamA, b: teamB),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: const ShapeDecoration(
-                          color: Colors.white,
-                          shape: StadiumBorder(),
-                        ),
-                        child: Text.rich(
-                          TextSpan(
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: AppColors.black,
+                  // IntrinsicHeight lets the Spacer push the pills to the
+                  // bottom while the banner sizes to its content.
+                  child: IntrinsicHeight(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 210 - 42),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Right padding keeps the text clear of the team
+                          // badges drawn in the top-right corner.
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: _badgeClearance,
                             ),
-                            children: [
-                              TextSpan(
-                                text: '${p.favorite.abbreviation} $favPct%',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  eyebrow.toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.4,
+                                  ),
                                 ),
-                              ),
-                              const TextSpan(text: ' to win · neutral site'),
-                            ],
+                                const SizedBox(height: 6),
+                                Text(
+                                  l10n.gamePreviewHero.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w900,
+                                    height: 0.98,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
+                          const Spacer(),
+                          _VsPill(a: teamA, b: teamB),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: const ShapeDecoration(
+                              color: Colors.white,
+                              shape: StadiumBorder(),
+                            ),
+                            child: Text.rich(
+                              TextSpan(
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.black,
+                                ),
+                                // Bold the "AUS 64%" part wherever the locale
+                                // puts it in the sentence.
+                                children: chanceAt < 0
+                                    ? [TextSpan(text: toWin)]
+                                    : [
+                                        TextSpan(
+                                          text: toWin.substring(0, chanceAt),
+                                        ),
+                                        TextSpan(
+                                          text: chance,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: toWin.substring(
+                                            chanceAt + chance.length,
+                                          ),
+                                        ),
+                                      ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -339,7 +420,7 @@ class _VsPill extends StatelessWidget {
           t.name.toUpperCase(),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             color: AppColors.black,
             fontSize: 12.5,
             fontWeight: FontWeight.w900,
@@ -360,9 +441,9 @@ class _VsPill extends StatelessWidget {
             color: Colors.white,
             shape: BoxShape.circle,
           ),
-          child: const Text(
-            'vs',
-            style: TextStyle(
+          child: Text(
+            context.l10n.versusLower,
+            style: const TextStyle(
               color: AppColors.black,
               fontWeight: FontWeight.w900,
               fontSize: 12,

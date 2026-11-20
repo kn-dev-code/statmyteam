@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/stats_repository.dart';
+import '../l10n/l10n.dart';
 import '../logic/football_stats.dart';
 import '../logic/sport_stats.dart';
 import '../models/models.dart';
@@ -78,21 +79,22 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
     final repo = StatsScope.of(context);
     final a = _a;
     final b = _b;
-    final colorA = teamColor(widget.teamA);
-    final colorB = teamColor(widget.teamB);
+    final colorA = teamColor(context, widget.teamA);
+    final colorB = teamColor(context, widget.teamB);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: const PillAppBar(title: 'Compare players'),
+      appBar: PillAppBar(title: l10n.comparePlayers),
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             Padding(
-              padding: EdgeInsets.only(left: 4),
+              padding: const EdgeInsets.only(left: 4),
               child: Text(
-                'POSITION',
+                l10n.position.toUpperCase(),
                 style: TextStyle(
-                  color: AppColors.muted,
+                  color: context.colors.muted,
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
@@ -107,7 +109,8 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                 if (_isFootball)
                   for (final group in PositionGroup.comparable)
                     ChoiceChip(
-                      label: Text(group.shortLabel),
+                      label: Text(l10n.groupShort(group)),
+                      tooltip: l10n.group(group),
                       selected: _group == group,
                       onSelected: (_) => setState(() {
                         _group = group;
@@ -118,6 +121,7 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
                   for (final position in _positions(repo))
                     ChoiceChip(
                       label: Text(position),
+                      tooltip: l10n.positionName(position),
                       selected: _position == position,
                       onSelected: (_) => setState(() {
                         _position = position;
@@ -162,11 +166,10 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
               ),
               if (a.position != b.position)
                 Padding(
-                  padding: EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 12),
                   child: Text(
-                    'Different positions: stats that only apply to one '
-                    'player show a dash for the other.',
-                    style: TextStyle(color: AppColors.gold, fontSize: 13),
+                    l10n.differentPositions,
+                    style: TextStyle(color: context.colors.gold, fontSize: 13),
                   ),
                 ),
               PlayerStatsLoader(
@@ -177,8 +180,8 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
             ] else
               StatCard(
                 child: Text(
-                  'One of these teams has no player listed at this position.',
-                  style: TextStyle(color: AppColors.muted),
+                  l10n.noPlayerAtPosition,
+                  style: TextStyle(color: context.colors.muted),
                 ),
               ),
           ],
@@ -234,14 +237,25 @@ class _PlayerCompareScreenState extends State<PlayerCompareScreen> {
     );
   }
 
+  /// Summary card that opens the player's page. InkWell over a transparent
+  /// Material gives focus, keyboard activation, a ripple, and button
+  /// semantics, which a bare GestureDetector does not.
   Widget _tappableCard(Player player, Team team) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => PlayerDetailScreen(player: player),
+    return Semantics(
+      button: true,
+      label: context.l10n.openPlayer(player.fullName),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.radius),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PlayerDetailScreen(player: player),
+            ),
+          ),
+          child: PlayerSummaryCard(player: player, team: team, compact: true),
         ),
       ),
-      child: PlayerSummaryCard(player: player, team: team, compact: true),
     );
   }
 }
@@ -266,14 +280,14 @@ class _PlayerPicker extends StatelessWidget {
       initialValue: options.contains(value) ? value : null,
       isExpanded: true,
       borderRadius: BorderRadius.circular(20),
-      dropdownColor: AppColors.surface,
+      dropdownColor: context.colors.surface,
       decoration: InputDecoration(
         labelText: team.name,
         labelStyle: TextStyle(
-          color: AppColors.muted,
+          color: context.colors.muted,
           fontWeight: FontWeight.w600,
         ),
-        fillColor: AppColors.surface,
+        fillColor: context.colors.surface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 12,
@@ -284,8 +298,18 @@ class _PlayerPicker extends StatelessWidget {
           DropdownMenuItem(
             value: p,
             child: Text(
-              '${p.position} ${p.firstName[0]}. ${p.lastName}'
-              '${p.isAvailable ? '' : ' (${p.status.shortLabel})'}',
+              p.isAvailable
+                  ? context.l10n.pickerItem(
+                      p.position,
+                      p.firstName.isEmpty ? '' : p.firstName[0],
+                      p.lastName,
+                    )
+                  : context.l10n.pickerItemUnavailable(
+                      p.position,
+                      p.firstName.isEmpty ? '' : p.firstName[0],
+                      p.lastName,
+                      context.l10n.statusShort(p.status),
+                    ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -327,6 +351,30 @@ class _EdgeSummary extends StatelessWidget {
       }
     }
     final total = winsA + winsB;
+    final l10n = context.l10n;
+
+    List<TextSpan> leads() {
+      final name = winsA > winsB ? a.lastName : b.lastName;
+      final text = l10n.leadsCategories(
+        name,
+        winsA > winsB ? winsA : winsB,
+        total,
+      );
+      // Highlight the leader's name wherever the locale places it.
+      final at = text.indexOf(name);
+      if (at < 0) return [TextSpan(text: text)];
+      return [
+        TextSpan(text: text.substring(0, at)),
+        TextSpan(
+          text: name,
+          style: TextStyle(
+            color: context.colors.accent,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        TextSpan(text: text.substring(at + name.length)),
+      ];
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(6, 24, 6, 12),
@@ -334,23 +382,10 @@ class _EdgeSummary extends StatelessWidget {
         TextSpan(
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           children: total == 0
-              ? [const TextSpan(text: 'No shared stats to compare')]
+              ? [TextSpan(text: l10n.noSharedStats)]
               : winsA == winsB
-              ? [TextSpan(text: 'Dead even: $winsA–$winsB in shared stats')]
-              : [
-                  TextSpan(
-                    text: winsA > winsB ? a.lastName : b.lastName,
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  TextSpan(
-                    text:
-                        ' leads ${winsA > winsB ? winsA : winsB} of '
-                        '$total categories',
-                  ),
-                ],
+              ? [TextSpan(text: l10n.deadEven(winsA, winsB))]
+              : leads(),
         ),
       ),
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/football_stats.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
@@ -28,9 +30,9 @@ class WinProbabilityBar extends StatelessWidget {
         crossAxisAlignment: align,
         children: [
           Text(
-            '$pct%',
+            context.l10n.percent(pct / 100),
             style: TextStyle(
-              color: leads ? AppColors.accent : AppColors.muted,
+              color: leads ? context.colors.accent : context.colors.muted,
               fontSize: 32,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.8,
@@ -43,7 +45,7 @@ class WinProbabilityBar extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: AppColors.muted,
+              color: context.colors.muted,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -52,7 +54,14 @@ class WinProbabilityBar extends StatelessWidget {
     }
 
     return Semantics(
-      label: '${teamA.name} $pctA percent, ${teamB.name} $pctB percent',
+      label: context.l10n.winProbabilitySemantics(
+        teamA.name,
+        pctA,
+        teamB.name,
+        pctB,
+      ),
+      // The label already says everything the texts below show.
+      excludeSemantics: true,
       child: Column(
         children: [
           Row(
@@ -75,14 +84,14 @@ class WinProbabilityBar extends StatelessWidget {
                 Expanded(
                   flex: pctA.clamp(1, 99),
                   child: _barSegment(
-                    aLeads ? AppColors.accent : AppColors.border,
+                    aLeads ? context.colors.accent : context.colors.border,
                   ),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   flex: pctB.clamp(1, 99),
                   child: _barSegment(
-                    aLeads ? AppColors.border : AppColors.accent,
+                    aLeads ? context.colors.border : context.colors.accent,
                   ),
                 ),
               ],
@@ -143,7 +152,7 @@ class StatCompareRow extends StatelessWidget {
     TextStyle valueStyle(bool better) => TextStyle(
       fontSize: 16,
       fontWeight: better ? FontWeight.w800 : FontWeight.w500,
-      color: better ? AppColors.accent : AppColors.muted,
+      color: better ? context.colors.accent : context.colors.muted,
     );
 
     Widget segment(Color color, bool better) => DecoratedBox(
@@ -162,13 +171,15 @@ class StatCompareRow extends StatelessWidget {
               SizedBox(
                 width: 72,
                 child: Text(
-                  a == null ? '—' : def.format(a),
+                  a == null
+                      ? context.l10n.noValue
+                      : context.l10n.statValue(def, a),
                   style: valueStyle(edge.aBetter),
                 ),
               ),
               Expanded(
                 child: Text(
-                  def.label,
+                  context.l10n.stat(def),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 14,
@@ -179,7 +190,9 @@ class StatCompareRow extends StatelessWidget {
               SizedBox(
                 width: 72,
                 child: Text(
-                  b == null ? '—' : def.format(b),
+                  b == null
+                      ? context.l10n.noValue
+                      : context.l10n.statValue(def, b),
                   textAlign: TextAlign.right,
                   style: valueStyle(edge.bBetter),
                 ),
@@ -206,8 +219,8 @@ class StatCompareRow extends StatelessWidget {
                   )
                 : DecoratedBox(
                     decoration: ShapeDecoration(
-                      color: AppColors.surfaceHigh,
-                      shape: StadiumBorder(),
+                      color: context.colors.surfaceHigh,
+                      shape: const StadiumBorder(),
                     ),
                   ),
           ),
@@ -269,7 +282,7 @@ class StatDuelGrid extends StatelessWidget {
                     VerticalDivider(
                       width: 1,
                       thickness: 1,
-                      color: AppColors.border,
+                      color: context.colors.border,
                     ),
                   Expanded(
                     child: c < rows[r].length
@@ -306,11 +319,11 @@ class _DuelTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            v == null ? '—' : def.format(v),
+            v == null ? context.l10n.noValue : context.l10n.statValue(def, v),
             style: TextStyle(
               fontSize: better ? 17 : 15,
               fontWeight: better ? FontWeight.w800 : FontWeight.w400,
-              color: better ? AppColors.accent : AppColors.muted,
+              color: better ? context.colors.accent : context.colors.muted,
               letterSpacing: -0.2,
             ),
           ),
@@ -320,7 +333,7 @@ class _DuelTile extends StatelessWidget {
                 ? Icon(
                     Icons.keyboard_arrow_up_rounded,
                     size: 18,
-                    color: AppColors.accent,
+                    color: context.colors.accent,
                   )
                 : null,
           ),
@@ -333,7 +346,7 @@ class _DuelTile extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            def.label,
+            context.l10n.stat(def),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
           ),
@@ -352,7 +365,33 @@ class _DuelTile extends StatelessWidget {
   }
 }
 
-/// W/L chips for a team's recent results, newest on the left.
+/// A completed game's outcome from one team's point of view.
+enum GameResult {
+  win,
+  loss,
+  tie,
+
+  /// Not final yet, or a score is missing from the feed.
+  unknown;
+
+  /// The result of [game] for [teamId]. Only a final with two equal scores
+  /// is a tie; a missing score is [unknown], not a tie.
+  static GameResult of(GameStats game, String teamId) {
+    final home = game.home.score;
+    final away = game.away.score;
+    if (!game.isFinal || home == null || away == null) return unknown;
+    if (home == away) return tie;
+    return game.winnerTeamId == teamId ? win : loss;
+  }
+
+  Color color(BuildContext context) => switch (this) {
+    GameResult.win => context.colors.accent,
+    GameResult.loss => context.colors.danger,
+    GameResult.tie || GameResult.unknown => context.colors.muted,
+  };
+}
+
+/// W/L/T chips for a team's recent results, newest on the left.
 class FormStrip extends StatelessWidget {
   const FormStrip({super.key, required this.teamId, required this.games});
 
@@ -362,38 +401,40 @@ class FormStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (games.isEmpty) {
-      return Text('No games yet', style: TextStyle(color: AppColors.muted));
+      return Text(
+        context.l10n.noGamesYet,
+        style: TextStyle(color: context.colors.muted),
+      );
     }
     return Wrap(
       spacing: 6,
       children: [
-        for (final game in games)
-          _chip(
-            game.winnerTeamId == teamId
-                ? 'W'
-                : (game.winnerTeamId == null ? 'T' : 'L'),
-          ),
+        for (final game in games) _chip(context, GameResult.of(game, teamId)),
       ],
     );
   }
 
-  Widget _chip(String result) {
-    final color = switch (result) {
-      'W' => AppColors.accent,
-      'L' => AppColors.danger,
-      _ => AppColors.muted,
-    };
-    return Container(
-      width: 28,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      child: Text(
-        result,
-        style: TextStyle(
-          color: result == 'W' ? AppColors.onAccent : Colors.white,
-          fontWeight: FontWeight.w800,
-          fontSize: 12.5,
+  Widget _chip(BuildContext context, GameResult result) {
+    return Semantics(
+      label: context.l10n.formResultSemantics(result.name),
+      excludeSemantics: true,
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: result.color(context),
+          shape: BoxShape.circle,
+        ),
+        child: Text(
+          context.l10n.formResult(result.name),
+          style: TextStyle(
+            color: result == GameResult.win
+                ? context.colors.onAccent
+                : Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 12.5,
+          ),
         ),
       ),
     );
@@ -418,22 +459,13 @@ class GameResultTile extends StatelessWidget {
     final isHome = game.homeTeamId == teamId;
     final mine = isHome ? game.home.score : game.away.score;
     final theirs = isHome ? game.away.score : game.home.score;
-    final won = game.winnerTeamId == teamId;
-    final d = game.startTime.toLocal();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    final outcome = GameResult.of(game, teamId);
+    final color = outcome.color(context);
+    final l10n = context.l10n;
+    final date = DateFormat.yMMMd(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(game.startTime.toLocal());
+    final result = l10n.formResult(outcome.name);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -446,13 +478,15 @@ class GameResultTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${isHome ? 'vs' : '@'} ${opponent.displayName}',
+                  isHome
+                      ? l10n.resultVs(opponent.displayName)
+                      : l10n.resultAt(opponent.displayName),
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  '${months[d.month - 1]} ${d.day}, ${d.year}',
-                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                  date,
+                  style: TextStyle(color: context.colors.muted, fontSize: 12),
                 ),
               ],
             ),
@@ -461,17 +495,16 @@ class GameResultTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: ShapeDecoration(
-              color: (won ? AppColors.accent : AppColors.danger).withValues(
-                alpha: 0.1,
-              ),
+              color: color.withValues(alpha: 0.1),
               shape: const StadiumBorder(),
             ),
             child: Text(
-              '${won ? 'W' : 'L'} $mine–$theirs',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: won ? AppColors.accent : AppColors.danger,
+              l10n.resultScore(
+                result,
+                '${mine ?? l10n.noValue}',
+                '${theirs ?? l10n.noValue}',
               ),
+              style: TextStyle(fontWeight: FontWeight.w800, color: color),
             ),
           ),
         ],
@@ -524,7 +557,7 @@ class StatGrid extends StatelessWidget {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh,
+                    color: context.colors.surfaceHigh,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Column(
@@ -542,7 +575,7 @@ class StatGrid extends StatelessWidget {
                       Text(
                         item.label,
                         style: TextStyle(
-                          color: AppColors.muted,
+                          color: context.colors.muted,
                           fontSize: 12.5,
                         ),
                       ),
@@ -556,5 +589,3 @@ class StatGrid extends StatelessWidget {
     );
   }
 }
-
-/// Points scored in recent completed games, newest last on the chart.

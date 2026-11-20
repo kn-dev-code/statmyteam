@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stats_widgets.dart';
 import 'main_menu_screen.dart';
+
+/// How the user chose to enter the demo.
+enum _SignInMethod { email, google, apple, guest }
 
 /// Demo sign-in UI for the app shell.
 ///
 /// Credentials and SSO buttons are **not** verified against a backend. They
 /// only gate entry into the demo experience so flows can be exercised
-/// end-to-end. Prefer [Continue as guest] when no form fill is needed.
+/// end-to-end. Prefer "Continue as guest" when no form fill is needed.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({
-    super.key,
-    this.onToggleTheme,
-  });
+  const LoginScreen({super.key});
 
-  final VoidCallback? onToggleTheme;
+  /// Minimum password length accepted by the demo form.
+  static const minPasswordLength = 6;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -35,41 +37,35 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _continue({required String method}) async {
+  Future<void> _continue({required _SignInMethod method}) async {
     if (_busy) return;
     setState(() => _busy = true);
     await Future<void>.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
 
-    final isGuest = method == 'guest';
+    final isGuest = method == _SignInMethod.guest;
+    final l10n = context.l10n;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          isGuest
-              ? 'Continuing in demo mode (no account).'
-              : 'Demo sign-in only — credentials are not verified.',
-        ),
+        content: Text(isGuest ? l10n.guestSnack : l10n.demoSignInSnack),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
       ),
     );
 
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => MainMenuScreen(
-          onToggleTheme: widget.onToggleTheme,
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const MainMenuScreen()),
     );
   }
 
   Future<void> _submitEmail() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    await _continue(method: 'email');
+    await _continue(method: _SignInMethod.email);
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Scaffold(
       body: SafeArea(
         child: ContentWidth(
@@ -82,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: AppColors.ink,
+                    color: context.colors.ink,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -93,9 +89,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'StatMyTeam',
-                style: TextStyle(
+              Text(
+                l10n.appTitle,
+                style: const TextStyle(
                   fontSize: 38,
                   fontWeight: FontWeight.w900,
                   fontStyle: FontStyle.italic,
@@ -104,15 +100,15 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Browse live and sample team stats. Sign-in is demo-only.',
-                style: TextStyle(color: AppColors.muted, fontSize: 15),
+                l10n.loginTagline,
+                style: TextStyle(color: context.colors.muted, fontSize: 15),
               ),
               const SizedBox(height: 16),
               Semantics(
                 liveRegion: true,
                 child: StatCard(
                   key: const Key('demo_auth_banner'),
-                  color: AppColors.gold.withValues(alpha: 0.16),
+                  color: context.colors.gold.withValues(alpha: 0.16),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -123,17 +119,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       Icon(
                         Icons.info_outline,
                         size: 18,
-                        color: AppColors.gold,
+                        color: context.colors.gold,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Demo mode: email, Google, and Apple do not verify '
-                          'accounts or store passwords. Use Continue as guest '
-                          'for the same access.',
+                          l10n.loginDemoBanner,
                           style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.text,
+                            color: context.colors.text,
                             height: 1.35,
                           ),
                         ),
@@ -153,15 +147,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _email,
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.mail_outline),
+                        decoration: InputDecoration(
+                          labelText: l10n.emailLabel,
+                          prefixIcon: const Icon(Icons.mail_outline),
                         ),
                         validator: (value) {
                           final text = value?.trim() ?? '';
-                          if (text.isEmpty) return 'Enter your email';
+                          if (text.isEmpty) return l10n.emailRequired;
                           if (!text.contains('@') || !text.contains('.')) {
-                            return 'Enter a valid email';
+                            return l10n.emailInvalid;
                           }
                           return null;
                         },
@@ -170,14 +164,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextFormField(
                         controller: _password,
                         obscureText: _obscure,
+                        // Keep passwords out of keyboard suggestions and
+                        // autocorrect dictionaries.
+                        enableSuggestions: false,
+                        autocorrect: false,
                         autofillHints: const [AutofillHints.password],
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: l10n.passwordLabel,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             tooltip: _obscure
-                                ? 'Show password'
-                                : 'Hide password',
+                                ? l10n.showPassword
+                                : l10n.hidePassword,
                             onPressed: () =>
                                 setState(() => _obscure = !_obscure),
                             icon: Icon(
@@ -189,8 +187,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: (value) {
                           final text = value ?? '';
-                          if (text.length < 6) {
-                            return 'Password must be at least 6 characters';
+                          const min = LoginScreen.minPasswordLength;
+                          if (text.length < min) {
+                            return l10n.passwordTooShort(min);
                           }
                           return null;
                         },
@@ -204,10 +203,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: AppColors.onInk,
+                                  color: context.colors.onInk,
                                 ),
                               )
-                            : const Text('Sign in (demo)'),
+                            : Text(l10n.signInDemo),
                       ),
                     ],
                   ),
@@ -216,33 +215,39 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 22),
               Row(
                 children: [
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
-                      'or continue with',
-                      style: TextStyle(color: AppColors.muted),
+                      l10n.orContinueWith,
+                      style: TextStyle(color: context.colors.muted),
                     ),
                   ),
-                  Expanded(child: Divider()),
+                  const Expanded(child: Divider()),
                 ],
               ),
               const SizedBox(height: 16),
               _SsoButton(
                 icon: Icons.g_mobiledata,
-                label: 'Continue with Google',
-                onPressed: _busy ? null : () => _continue(method: 'google'),
+                label: l10n.continueWithGoogle,
+                onPressed: _busy
+                    ? null
+                    : () => _continue(method: _SignInMethod.google),
               ),
               const SizedBox(height: 10),
               _SsoButton(
                 icon: Icons.apple,
-                label: 'Continue with Apple',
-                onPressed: _busy ? null : () => _continue(method: 'apple'),
+                label: l10n.continueWithApple,
+                onPressed: _busy
+                    ? null
+                    : () => _continue(method: _SignInMethod.apple),
               ),
               const SizedBox(height: 10),
               TextButton(
-                onPressed: _busy ? null : () => _continue(method: 'guest'),
-                child: const Text('Continue as guest'),
+                onPressed: _busy
+                    ? null
+                    : () => _continue(method: _SignInMethod.guest),
+                child: Text(l10n.continueAsGuest),
               ),
             ],
           ),

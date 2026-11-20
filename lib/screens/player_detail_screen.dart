@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/sport_stats.dart';
 import '../models/models.dart';
 import '../state/stats_scope.dart';
@@ -15,9 +16,22 @@ class PlayerDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final team = StatsScope.of(context).teamById(player.teamId);
+    final l10n = context.l10n;
+    final team = StatsScope.of(context).findTeamById(player.teamId);
+    if (team == null) {
+      // A feed id that no longer resolves: say so instead of crashing.
+      return Scaffold(
+        appBar: PillAppBar(title: player.fullName),
+        body: Center(
+          child: Text(
+            l10n.playerUnavailable,
+            style: TextStyle(color: context.colors.muted),
+          ),
+        ),
+      );
+    }
     final stats = SportStats.forPosition(player.sport, player.position);
-    final color = teamColor(team);
+    final color = teamColor(context, team);
 
     return Scaffold(
       appBar: PillAppBar(title: player.fullName),
@@ -26,7 +40,7 @@ class PlayerDetailScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
             PlayerSummaryCard(player: player, team: team),
-            const SectionTitle('Season stats'),
+            SectionTitle(l10n.seasonStats),
             PlayerStatsLoader(
               players: [player],
               builder: (context, loaded) {
@@ -39,17 +53,17 @@ class PlayerDetailScreen extends StatelessWidget {
                         items: [
                           for (final def in stats)
                             (
-                              label: def.label,
+                              label: l10n.stat(def),
                               value: withStats.seasonStats.containsKey(def.key)
-                                  ? def.format(withStats.stat(def.key))
-                                  : '—',
+                                  ? l10n.statValue(def, withStats.stat(def.key))
+                                  : l10n.noValue,
                             ),
                         ],
                       ),
                     ),
-                    const SectionTitle(
-                      'Stat profile',
-                      subtitle: 'Selected season totals',
+                    SectionTitle(
+                      l10n.statProfile,
+                      subtitle: l10n.statProfileSubtitle,
                     ),
                     StatCard(
                       child: PlayerStatBarsChart(
@@ -86,19 +100,18 @@ class PlayerSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = teamColor(team);
+    final l10n = context.l10n;
+    final color = teamColor(context, team);
     final bio = <(String, String)>[
-      ('Team', team.abbreviation),
-      if (player.age != null) ('Age', '${player.age}'),
-      if (player.heightLabel != null) ('Height', player.heightLabel!),
-      if (player.weightLbs != null) ('Weight', '${player.weightLbs} lb'),
-      if (player.classYear != null) ('Class', player.classYear!),
-      if (player.yearsPro != null)
-        (
-          'Experience',
-          player.yearsPro == 1 ? 'Rookie' : '${player.yearsPro} yrs',
-        ),
-      if (player.college != null) ('College', player.college!),
+      (l10n.bioTeam, team.abbreviation),
+      if (player.age case final age?) (l10n.bioAge, '$age'),
+      if (player.heightLabel case final height?) (l10n.bioHeight, height),
+      if (player.weightLbs case final weight?)
+        (l10n.bioWeight, l10n.weightLbs(weight)),
+      if (player.classYear case final classYear?) (l10n.bioClass, classYear),
+      if (player.yearsPro case final years?)
+        (l10n.bioExperience, years == 1 ? l10n.rookie : l10n.yearsPro(years)),
+      if (player.college case final college?) (l10n.bioCollege, college),
     ];
 
     return StatCard(
@@ -137,19 +150,19 @@ class PlayerSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            SportStats.positionName(player.sport, player.position),
-            style: TextStyle(color: AppColors.muted),
+            l10n.positionName(player.position),
+            style: TextStyle(color: context.colors.muted),
           ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: [
-              if (player.role != null) _Tag(player.role!.label, color),
+              if (player.role case final role?) _Tag(l10n.role(role), color),
               if (player.injuryNote != null)
                 _Tag(
                   player.injuryNote!,
-                  PlayerStatusChip.colorFor(player.status),
+                  PlayerStatusChip.colorFor(context, player.status),
                 ),
             ],
           ),
@@ -165,7 +178,10 @@ class PlayerSummaryCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         label,
-                        style: TextStyle(color: AppColors.muted, fontSize: 13),
+                        style: TextStyle(
+                          color: context.colors.muted,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     Flexible(

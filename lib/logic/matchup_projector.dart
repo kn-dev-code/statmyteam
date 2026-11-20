@@ -3,25 +3,72 @@ import 'dart:math' as math;
 import '../models/models.dart';
 
 /// Where the game is played, relative to team A.
-enum MatchupVenue {
-  teamAHome,
-  teamBHome,
-  neutral;
+enum MatchupVenue { teamAHome, teamBHome, neutral }
+
+/// What a [MatchupFactor] measures.
+enum FactorKind {
+  record,
+  scoringMargin,
+
+  /// Football: yards per game.
+  offense,
+
+  /// Football: yards allowed per game.
+  defense,
+
+  /// Football and basketball: turnover differential.
+  turnovers,
+
+  /// Basketball: field goal percentage.
+  shooting,
+
+  /// Basketball: rebounds per game.
+  rebounding,
+
+  /// Soccer: expected goals per game.
+  chanceCreation,
+
+  /// Soccer: expected goals against per game.
+  chancePrevention,
+
+  venue,
+  availability,
+  headToHead,
 }
 
-/// One reason the projection leans a certain way.
+/// One reason the projection leans a certain way. Carries the numbers
+/// behind it; the UI turns them into localized text.
 class MatchupFactor {
   const MatchupFactor({
-    required this.title,
-    required this.detail,
+    required this.kind,
     this.favors,
+    this.valueA,
+    this.valueB,
+    this.missingA = const [],
+    this.missingB = const [],
+    this.winsA = 0,
+    this.winsB = 0,
+    this.meetings = 0,
   });
 
-  final String title;
-  final String detail;
+  final FactorKind kind;
 
   /// The team this factor helps, or null when it is even.
   final Team? favors;
+
+  /// Each side's number for stat-comparison kinds. For [FactorKind.venue],
+  /// [valueA] is the home edge as a 0–1 win-chance bonus.
+  final double? valueA;
+  final double? valueB;
+
+  /// Starters who are not fully available ([FactorKind.availability]).
+  final List<Player> missingA;
+  final List<Player> missingB;
+
+  /// Head-to-head wins over the last [meetings] games.
+  final int winsA;
+  final int winsB;
+  final int meetings;
 }
 
 class MatchupProjection {
@@ -55,46 +102,97 @@ class MatchupProjection {
   double get spread =>
       ((teamAScore - teamBScore).abs() * 2).roundToDouble() / 2;
 
-  String get spreadLabel {
-    if (spread < 0.5) return "Pick'em";
-    final points = spread == spread.roundToDouble()
-        ? spread.toStringAsFixed(0)
-        : spread.toStringAsFixed(1);
-    return '${favorite.abbreviation} -$points';
-  }
+  /// Below this the game is a toss-up ("pick'em").
+  bool get isPickEm => spread < 0.5;
 
   double get projectedTotal => teamAScore + teamBScore;
 }
 
-/// Projects a football matchup from season stats, venue, and availability.
+/// How scores in one sport translate into win chances.
+class SportModel {
+  const SportModel({
+    required this.pythagoreanExponent,
+    required this.winChancePerPoint,
+    required this.homeFieldEdge,
+    required this.maxMargin,
+  });
+
+  /// Exponent for the Pythagorean win rate (points for vs against).
+  final double pythagoreanExponent;
+
+  /// Win-chance change per point (or goal) of projected margin near even.
+  final double winChancePerPoint;
+
+  /// Win-chance bonus for playing at home.
+  final double homeFieldEdge;
+
+  /// Largest projected margin, in points (or goals).
+  final double maxMargin;
+
+  static const football = SportModel(
+    pythagoreanExponent: 2.37,
+    winChancePerPoint: 0.03,
+    homeFieldEdge: 0.03,
+    maxMargin: 21,
+  );
+
+  /// NBA: Pythagorean exponent about 14, about 3% per point near even, and
+  /// home court worth about two points.
+  static const basketball = SportModel(
+    pythagoreanExponent: 14,
+    winChancePerPoint: 0.03,
+    homeFieldEdge: 0.06,
+    maxMargin: 25,
+  );
+
+  /// Soccer is low scoring, so each goal moves the chance much more.
+  static const soccer = SportModel(
+    pythagoreanExponent: 1.3,
+    winChancePerPoint: 0.2,
+    homeFieldEdge: 0.05,
+    maxMargin: 3,
+  );
+
+  static SportModel of(Sport sport) => switch (sport) {
+    Sport.basketball => basketball,
+    Sport.soccer => soccer,
+    _ => football,
+  };
+}
+
+/// Projects a matchup from season stats, venue, and availability.
 ///
 /// Steps:
 /// 1. Team strength = 50% actual win rate + 50% Pythagorean win rate (from
-///    points scored vs allowed, exponent 2.37). This damps lucky records.
-///    The result is pulled [sampleRegression] of the way toward .500 because
-///    a partial season is a small sample.
+///    points scored vs allowed, with a per-sport exponent). This damps lucky
+///    records. The result is pulled [sampleRegression] of the way toward
+///    .500 because a partial season is a small sample.
 /// 2. Log5 turns the two strengths into a head-to-head chance.
-/// 3. Home field adds [homeFieldEdge]; a neutral site adds nothing.
+/// 3. Home field adds the sport's [SportModel.homeFieldEdge]; a neutral
+///    site adds nothing.
 /// 4. Missing starters subtract: a starting QB is worth [qbImpact], any other
 ///    starter [starterImpact]. Questionable players count half.
-/// 5. Projected points blend each offense with the opposing defense; the
-///    margin is set from the win chance (~3% per point near even).
+/// 5. Projected scores blend each offense with the opposing defense; the
+///    margin is set from the win chance ([SportModel.winChancePerPoint]).
+///
+/// Stat factors are listed only when both teams report the stat, so a sport
+/// never shows another sport's numbers (such as yards for NBA teams).
 class MatchupProjector {
   MatchupProjector._();
 
+  /// The football home edge (see [SportModel.homeFieldEdge] for others).
   static const homeFieldEdge = 0.03;
   static const qbImpact = 0.06;
   static const starterImpact = 0.012;
-  static const pythagoreanExponent = 2.37;
-  static const winChancePerPoint = 0.03;
   static const sampleRegression = 0.25;
 
   static double pythagorean(Team team) {
     final pf = team.stat('ppg');
     final pa = team.stat('papg');
     if (pf <= 0 && pa <= 0) return 0.5;
-    final a = math.pow(pf, pythagoreanExponent);
-    final b = math.pow(pa, pythagoreanExponent);
+    final exponent = SportModel.of(team.sport).pythagoreanExponent;
+    final a = math.pow(pf, exponent);
+    final b = math.pow(pa, exponent);
     return a / (a + b);
   }
 
@@ -135,23 +233,51 @@ class MatchupProjector {
     List<GameStats> headToHead = const [],
     MatchupVenue venue = MatchupVenue.teamAHome,
   }) {
+    final model = SportModel.of(teamA.sport);
     final strengthA = strength(teamA);
     final strengthB = strength(teamB);
     final venueEdge = switch (venue) {
-      MatchupVenue.teamAHome => homeFieldEdge,
-      MatchupVenue.teamBHome => -homeFieldEdge,
+      MatchupVenue.teamAHome => model.homeFieldEdge,
+      MatchupVenue.teamBHome => -model.homeFieldEdge,
       MatchupVenue.neutral => 0.0,
     };
     final penaltyA = availabilityPenalty(rosterA);
     final penaltyB = availabilityPenalty(rosterB);
 
-    final chance = (log5(strengthA, strengthB) + venueEdge - penaltyA + penaltyB)
-        .clamp(0.03, 0.97);
+    final chance =
+        (log5(strengthA, strengthB) + venueEdge - penaltyA + penaltyB).clamp(
+          0.03,
+          0.97,
+        );
 
     final expectedA = (teamA.stat('ppg') + teamB.stat('papg')) / 2;
     final expectedB = (teamB.stat('ppg') + teamA.stat('papg')) / 2;
     final total = expectedA + expectedB;
-    final margin = ((chance - 0.5) / winChancePerPoint).clamp(-21.0, 21.0);
+    final margin = ((chance - 0.5) / model.winChancePerPoint).clamp(
+      -model.maxMargin,
+      model.maxMargin,
+    );
+
+    bool both(String key) =>
+        teamA.seasonStats.containsKey(key) &&
+        teamB.seasonStats.containsKey(key);
+
+    MatchupFactor? stat(
+      FactorKind kind,
+      String key, {
+      bool higherIsBetter = true,
+    }) => both(key)
+        ? _compare(
+            kind,
+            teamA,
+            teamB,
+            teamA.stat(key),
+            teamB.stat(key),
+            higherIsBetter: higherIsBetter,
+          )
+        : null;
+
+    double marginOf(Team t) => t.stat('ppg') - t.stat('papg');
 
     return MatchupProjection(
       teamA: teamA,
@@ -162,90 +288,72 @@ class MatchupProjector {
       teamBScore: math.max(0, total / 2 - margin / 2),
       factors: [
         _compare(
-          'Record',
+          FactorKind.record,
           teamA,
           teamB,
           teamA.winPercentage,
           teamB.winPercentage,
-          '${teamA.abbreviation} ${teamA.record} vs '
-              '${teamB.abbreviation} ${teamB.record}',
         ),
-        _compare(
-          'Scoring margin',
-          teamA,
-          teamB,
-          teamA.stat('ppg') - teamA.stat('papg'),
-          teamB.stat('ppg') - teamB.stat('papg'),
-          '${_signed(teamA.stat('ppg') - teamA.stat('papg'))} vs '
-              '${_signed(teamB.stat('ppg') - teamB.stat('papg'))} points per game',
-        ),
-        _compare(
-          'Offense',
-          teamA,
-          teamB,
-          teamA.stat('ypg'),
-          teamB.stat('ypg'),
-          '${teamA.stat('ypg').toStringAsFixed(1)} vs '
-              '${teamB.stat('ypg').toStringAsFixed(1)} yards per game',
-        ),
-        _compare(
-          'Defense',
-          teamA,
-          teamB,
-          -teamA.stat('yapg'),
-          -teamB.stat('yapg'),
-          '${teamA.stat('yapg').toStringAsFixed(1)} vs '
-              '${teamB.stat('yapg').toStringAsFixed(1)} yards allowed per game',
-        ),
-        _compare(
-          'Turnovers',
-          teamA,
-          teamB,
-          teamA.stat('toDiff'),
-          teamB.stat('toDiff'),
-          '${_signed(teamA.stat('toDiff'), 0)} vs '
-              '${_signed(teamB.stat('toDiff'), 0)} turnover differential',
-        ),
-        _venueFactor(teamA, teamB, venue),
+        if (both('ppg') && both('papg'))
+          _compare(
+            FactorKind.scoringMargin,
+            teamA,
+            teamB,
+            marginOf(teamA),
+            marginOf(teamB),
+          ),
+        ?stat(FactorKind.offense, 'ypg'),
+        ?stat(FactorKind.defense, 'yapg', higherIsBetter: false),
+        ?stat(FactorKind.shooting, 'fgPct'),
+        ?stat(FactorKind.rebounding, 'rpg'),
+        ?stat(FactorKind.chanceCreation, 'xg'),
+        ?stat(FactorKind.chancePrevention, 'xga', higherIsBetter: false),
+        ?stat(FactorKind.turnovers, 'toDiff'),
+        _venueFactor(teamA, teamB, venue, model),
         _availabilityFactor(teamA, teamB, rosterA, rosterB, penaltyA, penaltyB),
         _headToHeadFactor(teamA, teamB, headToHead),
       ],
     );
   }
 
+  static const _epsilon = 0.0001;
+
   static MatchupFactor _compare(
-    String title,
+    FactorKind kind,
     Team a,
     Team b,
     double valueA,
-    double valueB,
-    String detail,
-  ) {
-    const epsilon = 0.0001;
-    final favors = (valueA - valueB).abs() < epsilon
-        ? null
-        : (valueA > valueB ? a : b);
-    return MatchupFactor(title: title, detail: detail, favors: favors);
+    double valueB, {
+    bool higherIsBetter = true,
+  }) {
+    final Team? favors;
+    if ((valueA - valueB).abs() < _epsilon) {
+      favors = null;
+    } else {
+      favors = (valueA > valueB) == higherIsBetter ? a : b;
+    }
+    return MatchupFactor(
+      kind: kind,
+      favors: favors,
+      valueA: valueA,
+      valueB: valueB,
+    );
   }
 
-  static MatchupFactor _venueFactor(Team a, Team b, MatchupVenue venue) {
-    return switch (venue) {
-      MatchupVenue.neutral => const MatchupFactor(
-          title: 'Venue',
-          detail: 'Neutral site, no home-field edge',
-        ),
-      MatchupVenue.teamAHome => MatchupFactor(
-          title: 'Venue',
-          detail: '${a.city} home field, worth about 3%',
-          favors: a,
-        ),
-      MatchupVenue.teamBHome => MatchupFactor(
-          title: 'Venue',
-          detail: '${b.city} home field, worth about 3%',
-          favors: b,
-        ),
-    };
-  }
+  static MatchupFactor _venueFactor(
+    Team a,
+    Team b,
+    MatchupVenue venue,
+    SportModel model,
+  ) => MatchupFactor(
+    kind: FactorKind.venue,
+    valueA: venue == MatchupVenue.neutral ? 0 : model.homeFieldEdge,
+    favors: switch (venue) {
+      MatchupVenue.neutral => null,
+      MatchupVenue.teamAHome => a,
+      MatchupVenue.teamBHome => b,
+    },
+  );
 
   static MatchupFactor _availabilityFactor(
     Team a,
@@ -255,22 +363,16 @@ class MatchupProjector {
     double penaltyA,
     double penaltyB,
   ) {
-    String missing(Team team, List<Player> roster) {
-      final names = [
-        for (final p in roster)
-          if (p.isStarter && p.status != PlayerStatus.active)
-            '${p.position} ${p.lastName} (${p.status.shortLabel})',
-      ];
-      return names.isEmpty
-          ? '${team.abbreviation} healthy'
-          : '${team.abbreviation}: ${names.join(', ')}';
-    }
+    List<Player> missing(List<Player> roster) => [
+      for (final p in roster)
+        if (p.isStarter && p.status != PlayerStatus.active) p,
+    ];
 
-    const epsilon = 0.0001;
     return MatchupFactor(
-      title: 'Availability',
-      detail: '${missing(a, rosterA)} · ${missing(b, rosterB)}',
-      favors: (penaltyA - penaltyB).abs() < epsilon
+      kind: FactorKind.availability,
+      missingA: missing(rosterA),
+      missingB: missing(rosterB),
+      favors: (penaltyA - penaltyB).abs() < _epsilon
           ? null
           : (penaltyA < penaltyB ? a : b),
     );
@@ -281,25 +383,14 @@ class MatchupProjector {
     Team b,
     List<GameStats> games,
   ) {
-    if (games.isEmpty) {
-      return const MatchupFactor(
-        title: 'Head-to-head',
-        detail: 'No recent meetings',
-      );
-    }
     final winsA = games.where((g) => g.winnerTeamId == a.id).length;
     final winsB = games.where((g) => g.winnerTeamId == b.id).length;
     return MatchupFactor(
-      title: 'Head-to-head',
-      detail: '${a.abbreviation} $winsA–$winsB ${b.abbreviation} in the last '
-          '${games.length} meeting${games.length == 1 ? '' : 's'} '
-          '(context only, not weighted)',
+      kind: FactorKind.headToHead,
+      winsA: winsA,
+      winsB: winsB,
+      meetings: games.length,
       favors: winsA == winsB ? null : (winsA > winsB ? a : b),
     );
-  }
-
-  static String _signed(double value, [int decimals = 1]) {
-    final text = value.toStringAsFixed(decimals);
-    return value > 0 ? '+$text' : text;
   }
 }

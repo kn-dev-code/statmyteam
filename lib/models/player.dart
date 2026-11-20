@@ -8,37 +8,13 @@ enum PlayerStatus {
   out,
   injuredReserve;
 
-  String get label => switch (this) {
-        PlayerStatus.active => 'Active',
-        PlayerStatus.questionable => 'Questionable',
-        PlayerStatus.out => 'Out',
-        PlayerStatus.injuredReserve => 'Injured reserve',
-      };
-
-  String get shortLabel => switch (this) {
-        PlayerStatus.active => 'ACT',
-        PlayerStatus.questionable => 'Q',
-        PlayerStatus.out => 'OUT',
-        PlayerStatus.injuredReserve => 'IR',
-      };
-
   /// True when the player will not suit up.
   bool get isUnavailable =>
       this == PlayerStatus.out || this == PlayerStatus.injuredReserve;
 }
 
 /// Where a player sits on the depth chart.
-enum DepthRole {
-  starter,
-  rotation,
-  backup;
-
-  String get label => switch (this) {
-        DepthRole.starter => 'Starter',
-        DepthRole.rotation => 'Rotation',
-        DepthRole.backup => 'Backup',
-      };
-}
+enum DepthRole { starter, rotation, backup }
 
 /// A player attached to a [Team], with sport-agnostic season statistics.
 class Player {
@@ -145,24 +121,24 @@ class Player {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'firstName': firstName,
-        'lastName': lastName,
-        'teamId': teamId,
-        'position': position,
-        'jerseyNumber': jerseyNumber,
-        'sport': sport.name,
-        'seasonStats': seasonStats,
-        'role': role?.name,
-        'status': status.name,
-        'injuryNote': injuryNote,
-        'age': age,
-        'heightInches': heightInches,
-        'weightLbs': weightLbs,
-        'yearsPro': yearsPro,
-        'college': college,
-        'classYear': classYear,
-      };
+    'id': id,
+    'firstName': firstName,
+    'lastName': lastName,
+    'teamId': teamId,
+    'position': position,
+    'jerseyNumber': jerseyNumber,
+    'sport': sport.name,
+    'seasonStats': seasonStats,
+    'role': role?.name,
+    'status': status.name,
+    'injuryNote': injuryNote,
+    'age': age,
+    'heightInches': heightInches,
+    'weightLbs': weightLbs,
+    'yearsPro': yearsPro,
+    'college': college,
+    'classYear': classYear,
+  };
 
   factory Player.fromJson(Map<String, dynamic> json) {
     return Player(
@@ -182,8 +158,9 @@ class Player {
           : PlayerStatus.values.byName(json['status'] as String),
       injuryNote: json['injuryNote'] as String?,
       age: json['age'] == null ? null : asInt(json['age']),
-      heightInches:
-          json['heightInches'] == null ? null : asInt(json['heightInches']),
+      heightInches: json['heightInches'] == null
+          ? null
+          : asInt(json['heightInches']),
       weightLbs: json['weightLbs'] == null ? null : asInt(json['weightLbs']),
       yearsPro: json['yearsPro'] == null ? null : asInt(json['yearsPro']),
       college: json['college'] as String?,

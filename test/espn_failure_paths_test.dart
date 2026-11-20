@@ -75,22 +75,18 @@ void main() {
     Map<String, Object> routes, {
     Set<String> failing = const {},
     List<String>? log,
-  }) =>
-      MockClient((request) async {
-        final path = request.url.path;
-        log?.add(path);
-        if (failing.contains(path)) return http.Response('boom', 500);
-        final body = routes[path];
-        return body == null
-            ? http.Response('not found', 404)
-            : http.Response(jsonEncode(body), 200);
-      });
+  }) => MockClient((request) async {
+    final path = request.url.path;
+    log?.add(path);
+    if (failing.contains(path)) return http.Response('boom', 500);
+    final body = routes[path];
+    return body == null
+        ? http.Response('not found', 404)
+        : http.Response(jsonEncode(body), 200);
+  });
 
-  EspnLeagueApi api(http.Client client) => EspnLeagueApi(
-        EspnLeague.nba,
-        client: client,
-        retryDelay: Duration.zero,
-      );
+  EspnLeagueApi api(http.Client client) =>
+      EspnLeagueApi(EspnLeague.nba, client: client, retryDelay: Duration.zero);
 
   group('EspnHttp', () {
     test('a non-2xx status throws with the status code', () async {
@@ -100,8 +96,13 @@ void main() {
       );
       await expectLater(
         http_.getJson('https://example.test/x'),
-        throwsA(isA<EspnRequestException>()
-            .having((e) => e.statusCode, 'statusCode', 404)),
+        throwsA(
+          isA<EspnRequestException>().having(
+            (e) => e.statusCode,
+            'statusCode',
+            404,
+          ),
+        ),
       );
     });
 
@@ -119,9 +120,11 @@ void main() {
     test('a transient 503 is retried once', () async {
       var calls = 0;
       final http_ = EspnHttp(
-        MockClient((_) async => ++calls == 1
-            ? http.Response('busy', 503)
-            : http.Response('{"ok": true}', 200)),
+        MockClient(
+          (_) async => ++calls == 1
+              ? http.Response('busy', 503)
+              : http.Response('{"ok": true}', 200),
+        ),
         retryDelay: Duration.zero,
       );
       expect(await http_.getJson('https://example.test/x'), {'ok': true});
@@ -146,47 +149,53 @@ void main() {
   });
 
   group('fetchLeague', () {
-    test('empty standings throw instead of returning an empty league',
-        () async {
-      final routes = nbaFeed()..[standingsPath] = {'children': <Object>[]};
-      await expectLater(
-        api(serve(routes)).fetchLeague(),
-        throwsA(isA<EspnDataException>()),
-      );
-    });
+    test(
+      'empty standings throw instead of returning an empty league',
+      () async {
+        final routes = nbaFeed()..[standingsPath] = {'children': <Object>[]};
+        await expectLater(
+          api(serve(routes)).fetchLeague(),
+          throwsA(isA<EspnDataException>()),
+        );
+      },
+    );
 
-    test('the season comes from standings when the scoreboard fails',
-        () async {
-      final data = await api(serve(
-        nbaFeed(standingsSeason: true),
-        failing: {'$site/scoreboard'},
-      )).fetchLeague();
+    test('the season comes from standings when the scoreboard fails', () async {
+      final data = await api(
+        serve(nbaFeed(standingsSeason: true), failing: {'$site/scoreboard'}),
+      ).fetchLeague();
       expect(data.seasonYear, 2027);
     });
 
-    test('an unknown season throws rather than guessing from the calendar',
-        () async {
-      await expectLater(
-        api(serve(nbaFeed(scoreboardSeason: false))).fetchLeague(),
-        throwsA(isA<EspnDataException>()),
-      );
-    });
+    test(
+      'an unknown season throws rather than guessing from the calendar',
+      () async {
+        await expectLater(
+          api(serve(nbaFeed(scoreboardSeason: false))).fetchLeague(),
+          throwsA(isA<EspnDataException>()),
+        );
+      },
+    );
 
     test('a few failed rosters load the league with warnings', () async {
-      final data = await api(serve(
-        nbaFeed(),
-        failing: {'$site/teams/2/roster'},
-      )).fetchLeague();
+      final data = await api(
+        serve(nbaFeed(), failing: {'$site/teams/2/roster'}),
+      ).fetchLeague();
       expect(data.teams, hasLength(4));
       expect(data.players, hasLength(3));
-      expect(data.warnings, contains('1 of 4 rosters'));
+      expect(data.warnings, contains(const FeedGap(FeedPart.rosters, 1, 4)));
     });
 
     test('most rosters failing throws', () async {
       await expectLater(
-        api(serve(nbaFeed(), failing: {
-          for (final id in ['1', '2', '3']) '$site/teams/$id/roster',
-        })).fetchLeague(),
+        api(
+          serve(
+            nbaFeed(),
+            failing: {
+              for (final id in ['1', '2', '3']) '$site/teams/$id/roster',
+            },
+          ),
+        ).fetchLeague(),
         throwsA(isA<EspnDataException>()),
       );
     });
@@ -212,33 +221,41 @@ void main() {
       );
       expect(repo.liveLeagues, {League.nba});
       expect(repo.loadErrors, isEmpty);
-      expect(repo.loadWarnings[League.nba], contains('1 of 4 rosters'));
-    });
-
-    test('a league slower than the deadline falls back with an error',
-        () async {
-      final never = Completer<http.Response>();
-      final repo = await StatsRepository.live(
-        client: MockClient((_) => never.future),
-        leagues: const [EspnLeague.nba],
-        leagueTimeout: const Duration(milliseconds: 50),
-        retryDelay: Duration.zero,
+      expect(
+        repo.loadWarnings[League.nba],
+        contains(const FeedGap(FeedPart.rosters, 1, 4)),
       );
-      expect(repo.liveLeagues, isEmpty);
-      expect(repo.loadErrors[League.nba], contains('longer than'));
     });
 
-    test('a bug (non-feed error) is rethrown, not masked as sample data',
-        () async {
-      await expectLater(
-        StatsRepository.live(
-          client: MockClient((_) async => throw StateError('bug')),
+    test(
+      'a league slower than the deadline falls back with an error',
+      () async {
+        final never = Completer<http.Response>();
+        final repo = await StatsRepository.live(
+          client: MockClient((_) => never.future),
           leagues: const [EspnLeague.nba],
+          leagueTimeout: const Duration(milliseconds: 50),
           retryDelay: Duration.zero,
-        ),
-        throwsA(isA<StateError>()),
-      );
-    });
+        );
+        expect(repo.liveLeagues, isEmpty);
+        expect(repo.loadErrors[League.nba]?.kind, LoadFailureKind.timeout);
+        expect(repo.loadErrors[League.nba]?.detail, contains('longer than'));
+      },
+    );
+
+    test(
+      'a bug (non-feed error) is rethrown, not masked as sample data',
+      () async {
+        await expectLater(
+          StatsRepository.live(
+            client: MockClient((_) async => throw StateError('bug')),
+            leagues: const [EspnLeague.nba],
+            retryDelay: Duration.zero,
+          ),
+          throwsA(isA<StateError>()),
+        );
+      },
+    );
 
     test('a malformed field reads as missing data, not a crash', () async {
       final routes = nbaFeed()
@@ -256,23 +273,27 @@ void main() {
         retryDelay: Duration.zero,
       );
       expect(repo.liveLeagues, isEmpty);
-      expect(repo.loadErrors[League.nba], contains('no NBA standings'));
+      expect(repo.loadErrors[League.nba]?.kind, LoadFailureKind.badData);
+      expect(repo.loadErrors[League.nba]?.detail, contains('no NBA standings'));
     });
 
-    test('a failing standings request is caught while the scoreboard hangs',
-        () async {
-      final repo = await StatsRepository.live(
-        client: MockClient((request) async {
-          if (request.url.path == '$site/scoreboard') {
-            await Future<void>.delayed(const Duration(milliseconds: 50));
-          }
-          return http.Response('boom', 500);
-        }),
-        leagues: const [EspnLeague.nba],
-        retryDelay: Duration.zero,
-      );
-      expect(repo.loadErrors[League.nba], contains('500'));
-    });
+    test(
+      'a failing standings request is caught while the scoreboard hangs',
+      () async {
+        final repo = await StatsRepository.live(
+          client: MockClient((request) async {
+            if (request.url.path == '$site/scoreboard') {
+              await Future<void>.delayed(const Duration(milliseconds: 50));
+            }
+            return http.Response('boom', 500);
+          }),
+          leagues: const [EspnLeague.nba],
+          retryDelay: Duration.zero,
+        );
+        expect(repo.loadErrors[League.nba]?.kind, LoadFailureKind.server);
+        expect(repo.loadErrors[League.nba]?.detail, contains('500'));
+      },
+    );
   });
 
   group('withSeasonStats', () {
@@ -314,33 +335,37 @@ void main() {
       return (repo, repo.players.single);
     }
 
-    test('a server error is thrown and not cached, so a retry refetches',
-        () async {
-      final (repo, player) = await repoWith((call) async => call <= 2
-          // First attempt and its automatic retry both fail.
-          ? http.Response('boom', 500)
-          : http.Response(
-              jsonEncode({
-                'splits': {
-                  'categories': [
-                    {
-                      'name': 'general',
-                      'stats': [
-                        {'name': 'gamesPlayed', 'value': 9},
+    test(
+      'a server error is thrown and not cached, so a retry refetches',
+      () async {
+        final (repo, player) = await repoWith(
+          (call) async => call <= 2
+              // First attempt and its automatic retry both fail.
+              ? http.Response('boom', 500)
+              : http.Response(
+                  jsonEncode({
+                    'splits': {
+                      'categories': [
+                        {
+                          'name': 'general',
+                          'stats': [
+                            {'name': 'gamesPlayed', 'value': 9},
+                          ],
+                        },
                       ],
                     },
-                  ],
-                },
-              }),
-              200,
-            ));
-      await expectLater(
-        repo.withSeasonStats(player),
-        throwsA(isA<EspnRequestException>()),
-      );
-      expect(repo.loadedSeasonStats(player), isNull);
-      expect((await repo.withSeasonStats(player)).stat('gp'), 9);
-    });
+                  }),
+                  200,
+                ),
+        );
+        await expectLater(
+          repo.withSeasonStats(player),
+          throwsA(isA<EspnRequestException>()),
+        );
+        expect(repo.loadedSeasonStats(player), isNull);
+        expect((await repo.withSeasonStats(player)).stat('gp'), 9);
+      },
+    );
 
     test('concurrent requests for one player share a single fetch', () async {
       var athleteCalls = 0;
@@ -358,13 +383,10 @@ void main() {
     test('an empty result is refetched once it is stale', () async {
       var now = DateTime(2026, 11, 16, 12);
       var athleteCalls = 0;
-      final (repo, player) = await repoWith(
-        (call) async {
-          athleteCalls = call;
-          return http.Response('not found', 404);
-        },
-        clock: () => now,
-      );
+      final (repo, player) = await repoWith((call) async {
+        athleteCalls = call;
+        return http.Response('not found', 404);
+      }, clock: () => now);
       await repo.withSeasonStats(player);
       expect(repo.loadedSeasonStats(player)?.seasonStats, isEmpty);
 

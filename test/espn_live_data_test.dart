@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:statmyteam/data/espn/espn_leagues.dart';
 import 'package:statmyteam/data/stats_repository.dart';
+import 'package:statmyteam/l10n/l10n.dart';
 import 'package:statmyteam/models/models.dart';
 
 /// Offline tests for the ESPN live-data pipeline, against canned payloads
@@ -16,24 +18,26 @@ void main() {
   Map<String, dynamic> team(String id, String city, String name, String abbr) =>
       {'id': id, 'location': city, 'name': name, 'abbreviation': abbr};
 
-  Map<String, dynamic> stat(String name, num value, [String? type]) =>
-      {'name': name, 'type': type ?? name.toLowerCase(), 'value': value};
+  Map<String, dynamic> stat(String name, num value, [String? type]) => {
+    'name': name,
+    'type': type ?? name.toLowerCase(),
+    'value': value,
+  };
 
   Map<String, dynamic> stats(Map<String, Map<String, num>> categories) => {
-        'splits': {
-          'categories': [
-            for (final MapEntry(key: category, value: values)
-                in categories.entries)
-              {
-                'name': category,
-                'stats': [
-                  for (final MapEntry(:key, :value) in values.entries)
-                    {'name': key, 'value': value},
-                ],
-              },
-          ],
-        },
-      };
+    'splits': {
+      'categories': [
+        for (final MapEntry(key: category, value: values) in categories.entries)
+          {
+            'name': category,
+            'stats': [
+              for (final MapEntry(:key, :value) in values.entries)
+                {'name': key, 'value': value},
+            ],
+          },
+      ],
+    },
+  };
 
   final nbaRoutes = <String, Object>{
     '$site/scoreboard': {
@@ -177,17 +181,17 @@ void main() {
   late List<String> requested;
 
   http.Client fakeEspn() => MockClient((request) async {
-        final path = request.url.path;
-        requested.add(path);
-        // The NFL feed is "down" to exercise the per-league fallback.
-        if (path.contains('/football/nfl/')) {
-          return http.Response('upstream error', 500);
-        }
-        final body = nbaRoutes[path];
-        return body == null
-            ? http.Response('not found', 404)
-            : http.Response(jsonEncode(body), 200);
-      });
+    final path = request.url.path;
+    requested.add(path);
+    // The NFL feed is "down" to exercise the per-league fallback.
+    if (path.contains('/football/nfl/')) {
+      return http.Response('upstream error', 500);
+    }
+    final body = nbaRoutes[path];
+    return body == null
+        ? http.Response('not found', 404)
+        : http.Response(jsonEncode(body), 200);
+  });
 
   late StatsRepository repo;
 
@@ -199,14 +203,17 @@ void main() {
     );
   });
 
-  test('a failed league falls back to sample data without hiding the error',
-      () {
-    expect(repo.liveLeagues, {League.nba});
-    expect(repo.loadErrors.keys, [League.nfl]);
-    expect(repo.loadErrors[League.nfl], contains('500'));
-    expect(repo.sampleLeagues, [League.nfl]);
-    expect(repo.teams.where((t) => t.league == League.nfl), isNotEmpty);
-  });
+  test(
+    'a failed league falls back to sample data without hiding the error',
+    () {
+      expect(repo.liveLeagues, {League.nba});
+      expect(repo.loadErrors.keys, [League.nfl]);
+      expect(repo.loadErrors[League.nfl]?.kind, LoadFailureKind.server);
+      expect(repo.loadErrors[League.nfl]?.detail, contains('500'));
+      expect(repo.sampleLeagues, [League.nfl]);
+      expect(repo.teams.where((t) => t.league == League.nfl), isNotEmpty);
+    },
+  );
 
   test('teams take records, conference, colors, and stats from ESPN', () {
     final hawks = repo.teamById('nba-1');
@@ -246,34 +253,43 @@ void main() {
     final game = repo.recentGames('nba-1').single;
     expect(game.id, 'nba-g-900');
     expect(game.home.score, 120);
-    expect(repo.findTeamById(game.awayTeamId)?.displayName, 'Exhibition Select');
+    expect(
+      repo.findTeamById(game.awayTeamId)?.displayName,
+      'Exhibition Select',
+    );
     expect(repo.teams.any((t) => t.id == game.awayTeamId), isFalse);
   });
 
-  test('player stats load on demand, map to app keys, and are cached',
-      () async {
-    final guard =
-        repo.rosterFor('nba-1').firstWhere((p) => p.id == 'nba-p-100');
-    expect(repo.loadedSeasonStats(guard), isNull);
+  test(
+    'player stats load on demand, map to app keys, and are cached',
+    () async {
+      final guard = repo
+          .rosterFor('nba-1')
+          .firstWhere((p) => p.id == 'nba-p-100');
+      expect(repo.loadedSeasonStats(guard), isNull);
 
-    final loaded = await repo.withSeasonStats(guard);
-    expect(loaded.stat('gp'), 10);
-    expect(loaded.stat('pts'), 25);
-    expect(loaded.stat('fgPct'), closeTo(0.44, 1e-9));
+      final loaded = await repo.withSeasonStats(guard);
+      expect(loaded.stat('gp'), 10);
+      expect(loaded.stat('pts'), 25);
+      expect(loaded.stat('fgPct'), closeTo(0.44, 1e-9));
 
-    final before = requested.length;
-    expect((await repo.withSeasonStats(guard)).stat('pts'), 25);
-    expect(repo.loadedSeasonStats(guard)?.stat('pts'), 25);
-    expect(requested.length, before, reason: 'second lookup is cached');
-  });
+      final before = requested.length;
+      expect((await repo.withSeasonStats(guard)).stat('pts'), 25);
+      expect(repo.loadedSeasonStats(guard)?.stat('pts'), 25);
+      expect(requested.length, before, reason: 'second lookup is cached');
+    },
+  );
 
-  test('a player with no stats this season gets an empty map, not an error',
-      () async {
-    final forward =
-        repo.rosterFor('nba-1').firstWhere((p) => p.id == 'nba-p-101');
-    final loaded = await repo.withSeasonStats(forward);
-    expect(loaded.seasonStats, isEmpty);
-  });
+  test(
+    'a player with no stats this season gets an empty map, not an error',
+    () async {
+      final forward = repo
+          .rosterFor('nba-1')
+          .firstWhere((p) => p.id == 'nba-p-101');
+      final loaded = await repo.withSeasonStats(forward);
+      expect(loaded.seasonStats, isEmpty);
+    },
+  );
 
   test('sample players need no fetch', () {
     final sample = repo.players.firstWhere((p) => p.sport == Sport.football);
@@ -292,11 +308,12 @@ void main() {
     expect(club.displayName, 'Atlanta United FC');
   });
 
-  test('League.describe reads as prose', () {
-    expect(League.describe([League.nba]), 'NBA');
-    expect(League.describe([League.mls, League.nfl]), 'NFL and MLS');
+  test('league lists read as prose', () {
+    final en = lookupAppLocalizations(const Locale('en'));
+    expect(en.leagues([League.nba]), 'NBA');
+    expect(en.leagues([League.mls, League.nfl]), 'NFL and MLS');
     expect(
-      League.describe([League.nfl, League.ncaa, League.mls]),
+      en.leagues([League.nfl, League.ncaa, League.mls]),
       'NFL, NCAA, and MLS',
     );
   });

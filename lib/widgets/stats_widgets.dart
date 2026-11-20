@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 
@@ -20,7 +21,7 @@ class StatCard extends StatelessWidget {
     // Material (not a decorated Container) so ListTile ink and selection
     // colors inside the card stay visible.
     return Material(
-      color: color ?? AppColors.surface,
+      color: color ?? context.colors.surface,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.radius),
@@ -65,7 +66,7 @@ class SectionTitle extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     subtitle!,
-                    style: TextStyle(color: AppColors.muted, fontSize: 13),
+                    style: TextStyle(color: context.colors.muted, fontSize: 13),
                   ),
                 ],
               ],
@@ -89,7 +90,7 @@ class SectionLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: onTap,
-      style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+      style: TextButton.styleFrom(foregroundColor: context.colors.muted),
       child: Text(label, style: const TextStyle(fontSize: 15)),
     );
   }
@@ -107,14 +108,14 @@ class LabelPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: ShapeDecoration(
-        color: AppColors.surfaceHigh,
-        shape: StadiumBorder(),
+        color: context.colors.surfaceHigh,
+        shape: const StadiumBorder(),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16, color: AppColors.text),
+            Icon(icon, size: 16, color: context.colors.text),
             const SizedBox(width: 6),
           ],
           Text(
@@ -146,15 +147,15 @@ class MetricPill extends StatelessWidget {
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: ShapeDecoration(
-        color: AppColors.surfaceHigh,
-        shape: StadiumBorder(),
+        color: context.colors.surfaceHigh,
+        shape: const StadiumBorder(),
       ),
       child: Row(
         children: [
           Text(
             label,
             maxLines: 1,
-            style: TextStyle(color: AppColors.muted, fontSize: 14),
+            style: TextStyle(color: context.colors.muted, fontSize: 14),
           ),
           const SizedBox(width: 6),
           // The value takes the remaining width and scales down if a long
@@ -170,7 +171,7 @@ class MetricPill extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: valueColor ?? AppColors.text,
+                    color: valueColor ?? context.colors.text,
                   ),
                 ),
               ),
@@ -193,15 +194,17 @@ class PlayerStatusChip extends StatelessWidget {
   final PlayerStatus status;
   final bool compact;
 
-  static Color colorFor(PlayerStatus status) => switch (status) {
-    PlayerStatus.active => AppColors.accent,
-    PlayerStatus.questionable => AppColors.gold,
-    PlayerStatus.out || PlayerStatus.injuredReserve => AppColors.danger,
-  };
+  static Color colorFor(BuildContext context, PlayerStatus status) =>
+      switch (status) {
+        PlayerStatus.active => context.colors.accent,
+        PlayerStatus.questionable => context.colors.gold,
+        PlayerStatus.out ||
+        PlayerStatus.injuredReserve => context.colors.danger,
+      };
 
   @override
   Widget build(BuildContext context) {
-    final color = colorFor(status);
+    final color = colorFor(context, status);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: ShapeDecoration(
@@ -209,7 +212,9 @@ class PlayerStatusChip extends StatelessWidget {
         shape: const StadiumBorder(),
       ),
       child: Text(
-        compact ? status.shortLabel : status.label,
+        compact
+            ? context.l10n.statusShort(status)
+            : context.l10n.status(status),
         style: TextStyle(
           color: color,
           fontSize: 11.5,
@@ -220,7 +225,3 @@ class PlayerStatusChip extends StatelessWidget {
     );
   }
 }
-
-/// Split bar showing each side's share of a probability.
-
-
